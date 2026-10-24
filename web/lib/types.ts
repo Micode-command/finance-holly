@@ -224,3 +224,25 @@ export interface PortfolioCheck {
     stanceCheck: { change: number; allowed: [number, number]; ok: boolean } | null;
   } | null;
 }
+
+export interface RadarStock {
+  code: string; name: string; industry: string | null; note: string | null; inorganic: boolean;
+  close: number; pe: number | null; normalPE: number | null; fairPrice: number | null; fairGap: number | null;
+  yoy3: number | null; latestYoy: number | null; accel: number | null; dividendYield: number | null;
+  theme: string | null; indirectTheme: string | null; business: string | null; why: string | null;
+}
+
+export interface RadarResult {
+  status: "ok";
+  cached: boolean;
+  generatedAt: string;
+  revenueMonth: string;
+  priceDate: string | null;
+  model: string | null;
+  error?: string;
+  funnel: { universe: number; revHigh: number; accel: number; passed: number };
+  backtest: { period: string; upProb: number; baseUpProb: number; beatMedian: number; avgReturn: number; medianReturn: number;
+    baseAvgReturn: number; portfolioBeatMarket: number; picksPerMonth: number };
+  themes: { name: string; demand: string; watch: string }[];
+  stocks: RadarStock[];
+}

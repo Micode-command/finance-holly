@@ -13,7 +13,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from holly import data
-from holly import portfolio_check, stock_check
+from holly import portfolio_check, radar, stock_check
 from holly.access import AccessError, RateLimiter, check_limits, check_passcode
 from holly.ai_advisor import ask_gemini_json, generate_ai_summary
 from holly.config import get_secret
@@ -212,6 +212,28 @@ def portfolio_check_api(request: Request, body: dict = Body(...)):
         taiex = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
         portfolio_check.enrich(holdings, portfolio_check.fetch_light, taiex)
         result = portfolio_check.analyze(holdings, cash, body.get("goal"), _market_context(dash), get_secret("GEMINI_API_KEY"), ask_gemini_json)
+        return _clean({"status": "ok", **result})
+    except AccessError as e:
+        return JSONResponse({"detail": e.message}, status_code=e.status)
+
+
+RADAR_PER_CLIENT = RateLimiter(limit=10)
+
+
+@app.post("/api/radar")
+def radar_api(request: Request, body: dict = Body(...)):
+    """潛力股雷達：全站共用同一份名單 (6 小時更新一次)，所以重複查詢很便宜。"""
+    client = _client(request)
+    try:
+        check_passcode(body.get("passcode"), client)
+        wait = RADAR_PER_CLIENT.hit(client)
+        if wait:
+            raise AccessError(429, f"潛力股雷達每小時最多 {RADAR_PER_CLIENT.limit} 次，請 {wait} 分鐘後再試。")
+        headlines = [n["title"] for n in data.fetch_market_news()[:60]]
+        try:
+            result = radar.radar(headlines, get_secret("GEMINI_API_KEY"), ask_gemini_json)
+        except Exception as e:
+            raise AccessError(502, f"證交所資料暫時抓不到，請稍後再試。({str(e)[:100]})")
         return _clean({"status": "ok", **result})
     except AccessError as e:
         return JSONResponse({"detail": e.message}, status_code=e.status)

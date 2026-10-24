@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { StockBrief, StockCheck } from "@/lib/types";
 import PortfolioCheckTool from "./PortfolioCheckTool";
+import RadarTool from "./RadarTool";
 import { type Access, buttonCls, inputCls, postTool } from "./shared";
 import StockCheckResult from "./StockCheckResult";
 
@@ -19,8 +20,8 @@ function loadPasscode() {
   }
 }
 
-function StockCheckTool({ access }: { access: Access }) {
-  const [query, setQuery] = useState("");
+function StockCheckTool({ access, autoQuery }: { access: Access; autoQuery?: string }) {
+  const [query, setQuery] = useState(autoQuery ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<StockBrief[]>([]);
@@ -41,6 +42,8 @@ function StockCheckTool({ access }: { access: Access }) {
     if (body.status === "ambiguous") return setCandidates(body.candidates);
     setResult(body);
   }
+
+  useAutoRun(autoQuery, run);
 
   return (
     <div className="space-y-4">
@@ -70,14 +73,30 @@ function StockCheckTool({ access }: { access: Access }) {
   );
 }
 
+/** 從潛力股雷達點「深入健檢」時：元件以新的 key 重新掛載並自動查詢 */
+function useAutoRun(autoQuery: string | undefined, run: (q: string) => void) {
+  useEffect(() => {
+    if (autoQuery) run(autoQuery);
+    // 只在掛載時跑一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 const TABS = [
   { id: "stock", label: "🔍 個股健檢" },
   { id: "portfolio", label: "💼 我的配置健檢" },
+  { id: "radar", label: "📡 潛力股雷達" },
 ] as const;
 
 /** 互動工具：放在首頁 header 下方，需要密碼才能使用 (避免 AI 額度被濫用) */
 export default function ToolsPanel() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("stock");
+  const [autoCheck, setAutoCheck] = useState<{ code: string; n: number } | null>(null);
+  const checkFromRadar = (code: string) => {
+    setAutoCheck((prev) => ({ code, n: (prev?.n ?? 0) + 1 }));
+    setTab("stock");
+    document.getElementById("tools")?.scrollIntoView({ behavior: "smooth" });
+  };
   // 伺服器端沒有 localStorage：先給空字串，進到瀏覽器後才讀記住的密碼 (避免 hydration 不一致)
   const stored = useSyncExternalStore(noopSubscribe, loadPasscode, () => "");
   const [typed, setTyped] = useState<string | null>(null);
@@ -117,7 +136,9 @@ export default function ToolsPanel() {
       </div>
 
       <div className="mt-4">
-        {tab === "stock" ? <StockCheckTool access={access} /> : <PortfolioCheckTool access={access} />}
+        {tab === "stock" && <StockCheckTool key={autoCheck?.n ?? 0} access={access} autoQuery={autoCheck?.code} />}
+        {tab === "portfolio" && <PortfolioCheckTool access={access} />}
+        {tab === "radar" && <RadarTool access={access} onCheck={checkFromRadar} />}
       </div>
     </section>
   );

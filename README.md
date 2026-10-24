@@ -73,6 +73,12 @@ tests/                 後端離線測試 (模擬數據，不需網路與金鑰)
 .venv/bin/python scripts/update_export_orders.py && git commit -am "更新外銷訂單" && git push
 ```
 
+潛力股雷達需要近 3 年月底本益比與近 15 個月營收的快照 (`data/radar_*.csv.gz`)，每月更新一次即可 (約 5 分鐘)：
+
+```bash
+.venv/bin/python scripts/update_radar_history.py && git add data && git commit -m "更新雷達快照" && git push
+```
+
 ## 測試
 
 ```bash
