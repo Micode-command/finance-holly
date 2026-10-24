@@ -1,0 +1,20 @@
+{
+  "name": "Holly Dashboard",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["README.md"] },
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance", "bradlc.vscode-tailwindcss", "dbaeumer.vscode-eslint"]
+    }
+  },
+  "updateContentCommand": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt && cd web && npm install",
+  "postAttachCommand": { "server": "./dev.sh" },
+  "portsAttributes": {
+    "3000": { "label": "Dashboard", "onAutoForward": "openPreview" },
+    "8000": { "label": "API" }
+  },
+  "forwardPorts": [3000, 8000]
+}

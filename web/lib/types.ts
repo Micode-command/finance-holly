@@ -1,0 +1,127 @@
+// 與 api/payload.py 的輸出一一對應
+
+export type CardDesc =
+  | { kind: "explain"; formula: string; threshold: string; impact: string; thresholdLabel: string }
+  | { kind: "tip"; summary: string; hint: string };
+
+export type Range = "3M" | "1Y" | "3Y";
+
+export interface Card {
+  id: string;
+  title: string;
+  desc: CardDesc;
+  prType: "C" | "G";
+  isMacro: boolean;
+  invertColor: boolean;
+  decimals: number;
+  signed: boolean;
+  prefix: string;
+  suffix: string;
+  changeMode: "pct" | "abs";
+  defaultRange: Range;
+  refLines: { value: number; label: string }[];
+  available: boolean;
+  latest?: number;
+  lastDate?: string;
+  changes?: { label: string; value: number | null }[];
+  percentiles?: { label: string; value: number | null }[];
+  note?: string | null;
+  series?: [string, number][];
+}
+
+export interface Section {
+  title: string;
+  nav: string;
+  intro: string;
+  cards: Card[];
+}
+
+export type Stance = "offensive" | "neutral" | "defensive";
+
+export interface Verdict {
+  stance: Stance;
+  label: string;
+  headline: string;
+  actions: string[];
+  drivers: { tone: "good" | "bad"; text: string; short: string }[];
+  one_liner: string;
+}
+
+export interface Vital {
+  id: string;
+  label: string;
+  value: number;
+  change: number;
+  changeMode: "pct" | "abs";
+  prefix: string;
+  suffix: string;
+  decimals: number;
+  invertColor: boolean;
+  date: string;
+}
+
+export interface NewsItem {
+  title: string;
+  link: string;
+  published: string | null;
+  source: string;
+  topics: string[];
+  related: { id: string; label: string }[];
+}
+
+export interface MacroNote {
+  topic: string;
+  tone: "good" | "bad" | "neutral";
+  zh: string;
+  en: string;
+  metric: { label: string; value: string; change: string | null };
+}
+
+export interface Regime {
+  Forecast_Prob_Low_Vol: number;
+  Forecast_Prob_High_Vol: number;
+  Forecast_Prob_Black_Swan: number;
+}
+
+export interface HealthScore {
+  score: number;
+  level: "good" | "warn" | "bad";
+  status: string;
+  features: string[];
+  details: string[];
+}
+
+export interface BottomFishing {
+  values: Record<"Brent" | "CPI_YoY" | "DGS10" | "DGS30" | "DGS2" | "IORB", number>;
+  oilOk: boolean;
+  cpiOk: boolean;
+  longRatesOk: boolean;
+  cutPricedIn: boolean;
+  met: number;
+}
+
+export interface Dashboard {
+  asOf: string;
+  missingFred: string[];
+  aiEnabled: boolean;
+  verdict: Verdict;
+  vitals: Vital[];
+  regime: Regime;
+  news: NewsItem[];
+  macro: MacroNote[];
+  health: HealthScore;
+  bottomFishing: BottomFishing | null;
+  sections: Section[];
+}
+
+export interface AiResult {
+  error?: string;
+  model?: string;
+  cached?: boolean;
+  generatedAt?: string;
+  macro_phase_insight?: string;
+  broadcast?: string;
+  allocation_recommendation?: Record<string, number>;
+  allocation_reasons?: Record<string, string>;
+  market_insights_html?: string;
+}

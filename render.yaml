@@ -1,0 +1,32 @@
+# Render Blueprint：一次建立後端 (Python) 與前端 (Next.js) 兩個服務
+# 用法：Render 後台 → New → Blueprint → 選這個 GitHub 倉庫
+services:
+  - type: web
+    name: holly-api
+    runtime: python
+    plan: free
+    region: singapore          # 離台灣最近
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: FRED_API_KEY       # 建立時 Render 會請你貼上 (不會存進 GitHub)
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  - type: web
+    name: holly-web
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: web
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: API_URL            # 填後端網址，例如 https://holly-api.onrender.com
+        sync: false

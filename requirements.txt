@@ -1,0 +1,9 @@
+# 版本鎖定在本機測試過的組合，避免雲端裝到新版而壞掉
+pandas==3.1.0
+requests==2.34.2
+yfinance==1.7.0
+feedparser==6.0.14
+google-genai==2.33.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-dotenv==1.2.4
