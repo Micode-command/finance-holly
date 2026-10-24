@@ -10,14 +10,20 @@ import time
 import zipfile
 from datetime import datetime, timedelta
 
+from pathlib import Path
+
 import pandas as pd
 import requests
+
+from .config import get_secret
 
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 NDC_ZIP_URL = ("https://ws.ndc.gov.tw/Download.ashx?u=LzAwMS9hZG1pbmlzdHJhdG9yLzEwL3JlbGZpbGUvNTc4MS82MzkyL2Vh"
                "MjM1YmQ5LWQwNTItNGE2OS1hYmZjLWQ1Yzc4NWQzZDBlMi56aXA%3d&n=5pmv5rCj5oyH5qiZ5Y%2bK54eI6JmfLnppcA%3d%3d&icon=.zip")
 MOEA_EXPORT_ORDERS_URL = "https://service.moea.gov.tw/EE520/opendata/b.csv"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+# 經濟部網站會擋海外 IP (Render 主機在新加坡)：抓不到時改用專案內的備份檔 (執行 scripts/update_export_orders.py 更新)
+EXPORT_ORDERS_SNAPSHOT = Path(__file__).resolve().parents[1] / "data" / "export_orders.csv"
 YI = 1e8  # 1 億
 
 # 月資料「M 月」約在 M+1 月下旬公布；保守起見 M+2 月 1 日才採用 (回測也用同樣規則，避免偷看未來)
@@ -33,7 +39,10 @@ TW_COLUMNS = ["TW_Foreign_Net", "TW_Foreign_Net_20D", "TW_Trust_Net_20D", "TW_Ma
 # ---------- 下載 (網路) ----------
 
 def _finmind(dataset, start, **params):
-    r = requests.get(FINMIND_URL, params={"dataset": dataset, "start_date": start, **params}, headers=HEADERS, timeout=60)
+    # 沒有 token 時用匿名額度；雲端主機的 IP 是共用的，匿名額度常被別人用光，所以建議設定 FINMIND_TOKEN
+    token = get_secret("FINMIND_TOKEN")
+    headers = {**HEADERS, "Authorization": f"Bearer {token}"} if token else HEADERS
+    r = requests.get(FINMIND_URL, params={"dataset": dataset, "start_date": start, **params}, headers=headers, timeout=60)
     j = r.json()
     if j.get("msg") != "success":
         raise RuntimeError(f"{dataset}: {j.get('msg')}")
@@ -49,9 +58,15 @@ def _ndc_table():
 
 
 def _export_orders_table():
-    r = requests.get(MOEA_EXPORT_ORDERS_URL, headers=HEADERS, timeout=60)
-    r.raise_for_status()
-    return pd.read_csv(io.BytesIO(r.content), encoding="utf-8-sig")
+    try:
+        r = requests.get(MOEA_EXPORT_ORDERS_URL, headers=HEADERS, timeout=60)
+        r.raise_for_status()
+        return pd.read_csv(io.BytesIO(r.content), encoding="utf-8-sig")
+    except Exception as e:
+        if not EXPORT_ORDERS_SNAPSHOT.exists():
+            raise
+        LAST_ERRORS["exports"] = f"即時下載失敗，改用備份檔 ({type(e).__name__})"
+        return pd.read_csv(EXPORT_ORDERS_SNAPSHOT, encoding="utf-8-sig")
 
 
 def fetch_taiwan(years_back):

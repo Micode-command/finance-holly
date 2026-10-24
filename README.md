@@ -18,6 +18,7 @@
 ```
 FRED_API_KEY=...
 GEMINI_API_KEY=...
+FINMIND_TOKEN=...   # 台股籌碼數據，finmindtrade.com 免費註冊 (沒有也能跑，但雲端常被限流)
 ```
 
 ## 架構
@@ -61,6 +62,15 @@ tests/                 後端離線測試 (模擬數據，不需網路與金鑰)
 
 限制：2022～2026 只有約 20 段互不重疊的 3 個月，機會分數的相關 95% 信賴區間約 +0.05～+0.76；
 台股因子是從 14 個候選中挑出，有選擇偏誤。分數代表「機率偏向」，不是保證。
+
+## 每月維護
+
+經濟部外銷訂單網站會擋海外 IP，雲端抓不到時會用 `data/export_orders.csv` 備份檔。
+每月 20 日後在台灣的電腦執行一次並 push：
+
+```bash
+.venv/bin/python scripts/update_export_orders.py && git commit -am "更新外銷訂單" && git push
+```
 
 ## 測試
 

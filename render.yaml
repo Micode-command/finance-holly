@@ -16,6 +16,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: FINMIND_TOKEN      # 台股籌碼數據 (finmindtrade.com 免費註冊)；雲端共用 IP 的匿名額度常被用光
+        sync: false
 
   - type: web
     name: finance-holly-web

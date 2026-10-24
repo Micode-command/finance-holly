@@ -55,3 +55,35 @@ def test_monthly_data_not_dated_in_the_future():
     # 9 月數據已公布，但依規則 11/1 才採用；10/24 時最新應該還是 8 月數據 (10/1 採用)
     yoy = taiwan_frame(exports=exports, now="2026-10-24")["TW_Export_YoY"].dropna()
     assert yoy.index.max() == pd.Timestamp("2026-10-01") and yoy.iloc[-1] == 50
+
+
+def test_export_orders_falls_back_to_snapshot_when_blocked(monkeypatch):
+    import requests
+    from holly import taiwan
+
+    def blocked(*args, **kwargs):
+        raise requests.HTTPError("403 Client Error: Forbidden")
+
+    monkeypatch.setattr(taiwan.requests, "get", blocked)
+    taiwan.LAST_ERRORS.clear()
+    table = taiwan._export_orders_table()
+    assert (table["統計項目"] == "外銷訂單金額").sum() > 400       # 1984 年至今的月資料
+    assert "備份檔" in taiwan.LAST_ERRORS["exports"]
+
+
+def test_finmind_sends_token_when_configured(monkeypatch):
+    from holly import taiwan
+    seen = {}
+
+    class Resp:
+        def json(self):
+            return {"msg": "success", "data": []}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        seen.update(headers)
+        return Resp()
+
+    monkeypatch.setattr(taiwan.requests, "get", fake_get)
+    monkeypatch.setenv("FINMIND_TOKEN", "abc")
+    taiwan._finmind("TaiwanStockPER", "2026-01-01", data_id="2330")
+    assert seen["Authorization"] == "Bearer abc"
