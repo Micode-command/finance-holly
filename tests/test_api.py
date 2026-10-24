@@ -28,7 +28,7 @@ def test_dashboard_shape(client):
     assert len(cards) == sum(len(s.cards) for s in SECTIONS)
     assert all(c["available"] for c in cards)
     assert body["missingFred"] == []
-    assert 0 <= body["health"]["score"] <= 100
+    assert 0 <= body["scores"]["opportunity"] <= 100 and 0 <= body["scores"]["risk"] <= 100
 
 
 def test_weekly_series_not_drawn_as_steps(client):
@@ -56,7 +56,7 @@ def test_ai_without_key_returns_fallback(client, monkeypatch):
 def test_header_and_footer_payload(client):
     body = client.get("/api/dashboard").json()
     assert body["verdict"]["stance"] in {"offensive", "neutral", "defensive"}
-    assert body["verdict"]["one_liner"].startswith("今日台股")
+    assert body["verdict"]["one_liner"].startswith("今日台股建議")
     assert {v["id"] for v in body["vitals"]} >= {"TAIEX", "VIX", "DGS10"}
     assert abs(sum(body["regime"].values()) - 100) < 0.2
     # 與股市無關的新聞會被濾掉
@@ -90,3 +90,14 @@ def test_secret_tolerates_pasted_whitespace_and_quotes(monkeypatch):
     assert get_secret("FAKE_KEY") == "abc123"
     monkeypatch.setenv("FAKE_KEY", "   ")
     assert get_secret("FAKE_KEY") is None
+
+
+def test_every_card_has_glossary_terms_that_exist(client):
+    import re
+    from pathlib import Path
+    glossary = Path(__file__).resolve().parents[1] / "web/lib/glossary.ts"
+    ids = set(re.findall(r'id: "([a-z_]+)"', glossary.read_text()))
+    body = client.get("/api/dashboard").json()
+    for card in (c for s in body["sections"] for c in s["cards"]):
+        assert card["terms"], f"{card['id']} 沒有對應名詞"
+        assert set(card["terms"]) <= ids, f"{card['id']} 對應到不存在的名詞 {set(card['terms']) - ids}"

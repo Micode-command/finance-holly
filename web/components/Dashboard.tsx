@@ -2,7 +2,8 @@ import { getDashboard } from "@/lib/api";
 import AiPanel from "./AiPanel";
 import BottomFishing from "./BottomFishing";
 import Footer from "./Footer";
-import HealthScore from "./HealthScore";
+import Glossary from "./Glossary";
+import ScoreBreakdown from "./ScoreBreakdown";
 import Hero from "./Hero";
 import MetricCard from "./MetricCard";
 import { Reveal } from "./Parallax";
@@ -14,8 +15,10 @@ export default async function Dashboard() {
   const data = await getDashboard();
   const navItems = [
     { id: "ai", label: "AI 解析" },
+    { id: "scores", label: "雙分數" },
     { id: "signals", label: "買點信號" },
     ...data.sections.map((s, i) => ({ id: `sec-${i}`, label: s.nav })),
+    { id: "glossary", label: "📖 名詞辭典" },
   ];
 
   return (
@@ -31,9 +34,14 @@ export default async function Dashboard() {
         )}
 
         <Reveal>
-          <div id="ai" className="grid scroll-mt-20 items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <div id="ai" className="scroll-mt-20">
             <AiPanel enabled={data.aiEnabled} />
-            <HealthScore health={data.health} />
+          </div>
+        </Reveal>
+
+        <Reveal>
+          <div id="scores" className="scroll-mt-20">
+            <ScoreBreakdown scores={data.scores} />
           </div>
         </Reveal>
 
@@ -63,6 +71,14 @@ export default async function Dashboard() {
             </div>
           </section>
         ))}
+        <section id="glossary" className="scroll-mt-20">
+          <Reveal>
+            <p className="font-mono text-xs tracking-[0.25em] text-accent">GLOSSARY</p>
+            <h2 className="mt-1 text-2xl font-bold">📖 名詞小辭典</h2>
+            <p className="mt-1 text-sm text-ink-2">看不懂的名詞都在這裡：中文、英文全名、白話解釋，以及它對台股的影響。卡片上有虛線底線的名詞點一下也會跳到這裡。</p>
+          </Reveal>
+          <div className="mt-5"><Glossary /></div>
+        </section>
       </main>
 
       <Footer data={data} />

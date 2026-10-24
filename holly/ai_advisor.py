@@ -48,6 +48,11 @@ def build_data_summary(df, pr, headlines, context=None):
         if v:
             lines += ["", f"【量化系統今日結論】{v.get('label')}：{v.get('headline')}"]
             lines += [f"- {d['text']}" for d in v.get("drivers", [])]
+        s = context.get("scores")
+        if s:
+            lines.append(f"- 3 個月機會分數 {s['opportunity']} / 100 (≥55 加碼、<35 減碼)；風險溫度 {s['risk']} / 100 (越高越動盪)")
+            if s.get("odds"):
+                lines.append(f"- 歷史上類似分數，3 個月後台股上漲機率 {s['odds']['upProb']}% (平常 {s['odds']['baseUpProb']}%)")
         notes = context.get("macro") or []
         if notes:
             lines += ["", "【FRED 總經觀察】"] + [f"- {n['topic']}：{n['zh']}" for n in notes]

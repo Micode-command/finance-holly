@@ -1,6 +1,7 @@
 import pandas as pd
 
-from holly.signals import BottomFishing, HealthScore
+from holly.scores import MarketScores
+from holly.signals import BottomFishing
 from holly.verdict import collect_drivers, market_verdict
 
 
@@ -8,25 +9,31 @@ def _df(**cols):
     return pd.DataFrame(cols, index=pd.bdate_range("2026-01-01", periods=30))
 
 
-def test_defensive_when_risks_pile_up():
+def _scores(opp, risk, up=None):
+    odds = {"upProb": up, "avgReturn": 1.0, "range": "x", "days": 100, "baseUpProb": 70} if up else None
+    return MarketScores(opp, risk, 0, 0, odds=odds)
+
+
+def test_trim_when_opportunity_low():
     df = _df(VIX=30.0, DGS10=4.9, Brent=110.0, USDTWD_ROC_5D=1.0)
-    v = market_verdict(df, HealthScore(10, "bad", "恐慌殺盤"), None)
-    assert v.stance == "defensive" and v.label == "防守"
+    v = market_verdict(df, _scores(25, 80, up=31))
+    assert v.stance == "defensive" and v.label == "減碼"
+    assert v.headline == "風險高、勝率低，先求自保"
     assert v.drivers[0]["tone"] == "bad"
-    assert "VIX 恐慌" in v.one_liner and "提高台幣現金" in v.one_liner
+    assert "上漲機率約 31%" in v.one_liner and "股票比重往下調" in v.one_liner
 
 
-def test_offensive_when_bottom_fishing_confirmed():
-    df = _df(VIX=14.0, DGS10=3.9)
+def test_add_but_pace_slowly_when_stormy():
+    v = market_verdict(_df(VIX=32.0), _scores(62, 85))
+    assert v.stance == "offensive" and v.label == "加碼"
+    assert "不要一次重押" in v.actions[2]
+
+
+def test_hold_in_the_middle_and_mentions_bottom_fishing():
     bf = BottomFishing({}, True, True, True, False)
-    v = market_verdict(df, HealthScore(55, "warn", "震盪整理"), bf)
-    assert v.stance == "offensive"
-    assert v.drivers[0]["tone"] == "good"
-
-
-def test_neutral_without_strong_signals():
-    v = market_verdict(_df(VIX=18.0), HealthScore(50, "warn", "震盪整理"), None)
-    assert v.stance == "neutral"
+    v = market_verdict(_df(VIX=18.0), _scores(44, 30), bf)
+    assert v.stance == "neutral" and v.label == "維持"
+    assert any("四大長線買點已成立 3/4" in a for a in v.actions)
     assert collect_drivers(_df(VIX=18.0)) == []
 
 

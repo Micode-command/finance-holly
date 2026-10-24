@@ -112,7 +112,7 @@ def dashboard():
 def ai_summary():
     dataset, payload = cache.get()
     # 把頁面上的結論與總經評語一起給 AI，避免 AI 的解讀和頁面自相矛盾
-    context = {"verdict": payload["verdict"], "macro": payload["macro"]}
+    context = {"verdict": payload["verdict"], "macro": payload["macro"], "scores": payload["scores"]}
     return ai_cache.get(cache.version, lambda: generate_ai_summary(dataset.df, get_secret("GEMINI_API_KEY"), context))
 
 

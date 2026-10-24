@@ -20,6 +20,7 @@ export interface Card {
   changeMode: "pct" | "abs";
   defaultRange: Range;
   refLines: { value: number; label: string }[];
+  terms: string[];
   available: boolean;
   latest?: number;
   lastDate?: string;
@@ -83,12 +84,23 @@ export interface Regime {
   Forecast_Prob_Black_Swan: number;
 }
 
-export interface HealthScore {
-  score: number;
-  level: "good" | "warn" | "bad";
-  status: string;
-  features: string[];
-  details: string[];
+export interface ScoreFactor {
+  key: string;
+  label: string;
+  value: string;
+  score: number; // 0~100，越高 = 對該分數貢獻越大
+  why: string;
+}
+
+export interface MarketScores {
+  opportunity: number;
+  risk: number;
+  opportunity_change_5d: number;
+  risk_change_5d: number;
+  opportunity_details: ScoreFactor[];
+  risk_details: ScoreFactor[];
+  odds: { range: string; upProb: number; avgReturn: number; days: number; baseUpProb: number } | null;
+  history: [string, number, number][];
 }
 
 export interface BottomFishing {
@@ -109,7 +121,7 @@ export interface Dashboard {
   regime: Regime;
   news: NewsItem[];
   macro: MacroNote[];
-  health: HealthScore;
+  scores: MarketScores | null;
   bottomFishing: BottomFishing | null;
   sections: Section[];
 }

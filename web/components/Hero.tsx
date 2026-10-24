@@ -3,9 +3,9 @@ import MacroCommentary from "./MacroCommentary";
 import RefreshButton from "./RefreshButton";
 
 export const STANCE = {
-  defensive: { icon: "🛡️", text: "text-bad", glow: "rgba(248,113,113,0.35)", ring: "var(--bad)", tag: "DEFENSIVE" },
-  neutral: { icon: "⚖️", text: "text-warn", glow: "rgba(251,191,36,0.28)", ring: "var(--warn)", tag: "NEUTRAL" },
-  offensive: { icon: "🚀", text: "text-good", glow: "rgba(52,211,153,0.32)", ring: "var(--good)", tag: "OFFENSIVE" },
+  defensive: { icon: "🛡️", text: "text-bad", glow: "rgba(248,113,113,0.35)", ring: "var(--bad)", tag: "TRIM · 減碼" },
+  neutral: { icon: "⚖️", text: "text-warn", glow: "rgba(251,191,36,0.28)", ring: "var(--warn)", tag: "HOLD · 維持" },
+  offensive: { icon: "🚀", text: "text-good", glow: "rgba(52,211,153,0.32)", ring: "var(--good)", tag: "ADD · 加碼" },
 } satisfies Record<Stance, object>;
 
 function fmtVital(v: Vital) {
@@ -46,11 +46,11 @@ function Ticker({ vitals }: { vitals: Vital[] }) {
 }
 
 /** 健康度環形儀表 */
-function Gauge({ score, color }: { score: number; color: string }) {
+function Gauge({ score, color, label, term }: { score: number; color: string; label: string; term: string }) {
   const r = 52;
   const c = 2 * Math.PI * r;
   return (
-    <div className="relative h-36 w-36 shrink-0" role="img" aria-label={`台股健康度 ${score} 分`}>
+    <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`${label} ${score} 分`}>
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--neutral)" strokeWidth="8" />
         <circle
@@ -61,7 +61,7 @@ function Gauge({ score, color }: { score: number; color: string }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-mono text-4xl font-bold">{score}</span>
-        <span className="text-[11px] text-muted">台股健康度 /100</span>
+        <a href={`#term-${term}`} className="text-[11px] text-muted hover:text-accent">{label}</a>
       </div>
     </div>
   );
@@ -183,9 +183,19 @@ export default function Hero({ data }: { data: Dashboard }) {
                   {s.icon} {v.label}
                 </p>
                 <p className="mt-3 text-xl font-semibold sm:text-2xl">{v.headline}</p>
-                <p className="mt-1 text-sm text-ink-2">{data.health.status}</p>
+                {data.scores?.odds && (
+                  <p className="mt-2 text-sm text-ink-2">
+                    📊 歷史上類似分數，3 個月後台股上漲機率 <b className="font-mono text-ink">{data.scores.odds.upProb}%</b>
+                    <span className="text-muted">（平常是 {data.scores.odds.baseUpProb}%）</span>
+                  </p>
+                )}
               </div>
-              <Gauge score={data.health.score} color={s.ring} />
+              {data.scores && (
+                <div className="flex gap-3">
+                  <Gauge score={data.scores.opportunity} color={s.ring} label="3 個月機會" term="opportunity_score" />
+                  <Gauge score={data.scores.risk} color={data.scores.risk >= 65 ? "var(--bad)" : data.scores.risk >= 35 ? "var(--warn)" : "var(--good)"} label="風險溫度" term="risk_score" />
+                </div>
+              )}
             </div>
 
             <div className="mt-6 grid gap-5 sm:grid-cols-2">

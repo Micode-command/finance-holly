@@ -1,4 +1,5 @@
 import { changeTone, formatChange, formatValue, prBand } from "@/lib/format";
+import { TERM_BY_ID } from "@/lib/glossary";
 import type { Card } from "@/lib/types";
 import TrendChart from "./TrendChart";
 
@@ -69,13 +70,26 @@ function thresholdStatus(card: Card) {
 
 function Explanation({ card }: { card: Card }) {
   const d = card.desc;
+  const terms = card.terms.map((id) => TERM_BY_ID[id]).filter(Boolean);
   return (
     <details className="group text-xs text-ink-2">
-      <summary className="cursor-pointer list-none text-muted hover:text-ink-2">
-        <span className="group-open:hidden">▸ 這個指標怎麼看</span>
+      <summary className="cursor-pointer list-none text-muted hover:text-accent">
+        <span className="group-open:hidden">📖 白話解釋：{terms.map((x) => x.name).join("、") || "這個指標怎麼看"}</span>
         <span className="hidden group-open:inline">▾ 收合說明</span>
       </summary>
-      <div className="mt-2 space-y-1 leading-relaxed">
+      {terms.map((term) => (
+        <div key={term.id} className="mt-3 rounded-lg bg-page/60 p-3">
+          <p className="font-semibold text-ink">{term.name}</p>
+          <p className="font-mono text-[10px] text-muted">{term.en}</p>
+          <p className="mt-1.5 text-ink-2">{term.short}</p>
+          <ul className="mt-1.5 space-y-0.5">
+            {term.read.slice(0, 3).map((r) => <li key={r}>› {r}</li>)}
+          </ul>
+          <a href={`#term-${term.id}`} className="mt-1.5 inline-block text-accent hover:underline">看完整解釋 →</a>
+        </div>
+      ))}
+      <p className="mt-3 font-semibold text-ink">這張卡片的重點</p>
+      <div className="mt-1 space-y-1 leading-relaxed">
         {d.kind === "explain" ? (
           <>
             <p><b className="text-ink">公式：</b>{d.formula}</p>

@@ -1,7 +1,7 @@
 import pandas as pd
 
 from holly.indicators import build_dataset
-from holly.signals import bottom_fishing_signals, pr_matrix, regime_probabilities, taiwan_health_score
+from holly.signals import bottom_fishing_signals, pr_matrix, regime_probabilities
 
 
 def test_bottom_fishing_none_when_data_missing(raw):
@@ -15,13 +15,6 @@ def test_bottom_fishing_conditions():
     bf = bottom_fishing_signals(df)
     assert (bf.oil_ok, bf.cpi_ok, bf.long_rates_ok, bf.cut_priced_in) == (True, True, False, True)
     assert bf.met == 3
-
-
-def test_health_score_bounded(raw):
-    hs = taiwan_health_score(build_dataset(raw).df)
-    assert 0 <= hs.score <= 100
-    assert hs.level in {"good", "warn", "bad"}
-    assert len(hs.details) == 5
 
 
 def test_regime_probabilities_sum_to_100(raw):

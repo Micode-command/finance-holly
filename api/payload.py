@@ -4,11 +4,12 @@ from dataclasses import asdict
 
 import pandas as pd
 
-from holly.catalog import SECTIONS
+from holly.catalog import CARD_TERMS, SECTIONS
 from holly.commentary import macro_commentary
 from holly.indicators import cycle_pr, growth_pr
 from holly.news import market_moving_news
-from holly.signals import bottom_fishing_signals, regime_probabilities, taiwan_health_score
+from holly.scores import market_scores
+from holly.signals import bottom_fishing_signals, regime_probabilities
 from holly.verdict import market_verdict, vitals
 
 CHART_YEARS = 3
@@ -73,6 +74,7 @@ def card_payload(dataset, spec):
         "decimals": spec.decimals, "signed": spec.signed, "prefix": spec.prefix, "suffix": spec.suffix,
         "changeMode": spec.change_mode, "defaultRange": spec.range,
         "refLines": [{"value": v, "label": label} for v, label in spec.ref_lines],
+        "terms": CARD_TERMS.get(spec.column, []),
         "available": False,
     }
     if spec.column not in dataset.df.columns or dataset.df[spec.column].dropna().empty:
@@ -92,9 +94,9 @@ def card_payload(dataset, spec):
 
 def dashboard_payload(dataset, news_items=()):
     df = dataset.df
-    health = taiwan_health_score(df)
+    scores = market_scores(df)
     bf = bottom_fishing_signals(df)
-    verdict = market_verdict(df, health, bf)
+    verdict = market_verdict(df, scores, bf)
     return {
         "asOf": _date(df.index[-1]),
         "missingFred": dataset.missing_fred,
@@ -103,7 +105,7 @@ def dashboard_payload(dataset, news_items=()):
         "regime": regime_probabilities(df),
         "news": market_moving_news(list(news_items)),
         "macro": macro_commentary(dataset),
-        "health": asdict(health),
+        "scores": asdict(scores) if scores else None,
         "bottomFishing": None if bf is None else {
             "values": {k: _num(v) for k, v in bf.values.items()},
             "oilOk": bool(bf.oil_ok), "cpiOk": bool(bf.cpi_ok), "longRatesOk": bool(bf.long_rates_ok),

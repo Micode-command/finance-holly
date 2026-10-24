@@ -122,3 +122,36 @@ SECTIONS = [
         CardSpec("Core_PCE_YoY", "核心 PCE 年增率", explain("扣除能源食物的真實通膨。", "黏性極強，降至 2% 才安全。", "聯準會決策的唯一核心，此數值不降，大資金就不敢定價寬鬆週期。"), range="3Y", invert_color=True, suffix="%", is_macro=True, ref_lines=[(2, "2% 目標")]),
     ]),
 ]
+
+
+# 每張卡片對應的名詞 (id 對應 web/lib/glossary.ts)，卡片上的「白話解釋」會列出這些名詞
+CARD_TERMS = {
+    "USDTWD_ROC_5D": ["usdtwd", "foreign_investors"],
+    "HY_Spread_Chg_5D": ["hy_spread"],
+    "VIX_Dev_20D": ["vix", "ma_deviation"],
+    "Total_Assets_T": ["fed_balance_sheet", "qe_qt"],
+    "TGA_Account_T": ["tga"],
+    "Net_Liquidity_T": ["net_liquidity", "tga", "on_rrp"],
+    "SMH_Dev_200D": ["ma_deviation", "sox_smh"],
+    "SMH_Relative_Strength": ["relative_strength", "sox_smh"],
+    "SPY": ["us_etfs"], "QQQ": ["us_etfs"], "IWM": ["us_etfs"], "XLP": ["us_etfs"],
+    "TAIEX": ["taiex"],
+    "SOX": ["sox_smh"],
+    "Copper": ["copper"],
+    "USDTWD": ["usdtwd", "foreign_investors"],
+    "VIX": ["vix"],
+    "High_Yield_Spread": ["hy_spread"],
+    "DXY": ["dxy"],
+    "DGS30": ["treasury_yields"],
+    "Brent": ["brent"],
+    "Gold": ["gold"],
+    "CPI_YoY": ["cpi"],
+    "Buffett": ["buffett"],
+    "Reserves_T": ["reserves"],
+    "RRP_T": ["on_rrp"],
+    "Liquidity_Spread": ["sofr", "iorb"],
+    "Yield_Curve": ["yield_curve", "treasury_yields"],
+    "Unemployment_Rate": ["unemployment"],
+    "Sahm_Indicator": ["sahm", "unemployment"],
+    "Core_PCE_YoY": ["pce", "cpi"],
+}

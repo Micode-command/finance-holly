@@ -1,4 +1,4 @@
-"""今日結論：把所有訊號收斂成「進攻 / 中性 / 防守」與一句話。純規則，不呼叫 AI。
+"""今日結論：把雙分數收斂成「加碼 / 維持 / 減碼」與一句話。純規則，不呼叫 AI。
 
 給首頁 header 與 footer 用。這是量化規則的歸納，不是投資建議。
 """
@@ -15,7 +15,7 @@ class Driver:
 @dataclass
 class Verdict:
     stance: str             # "offensive" / "neutral" / "defensive"
-    label: str              # 進攻 / 中性 / 防守
+    label: str              # 加碼 / 維持 / 減碼
     headline: str           # header 大標
     actions: list = field(default_factory=list)
     drivers: list = field(default_factory=list)
@@ -80,42 +80,55 @@ def collect_drivers(df):
     return d
 
 
+# 以「長期持有、調整股票比重」的投資人為對象
 ACTIONS = {
-    "offensive": ["分批加碼核心股票與半導體", "維持月配息現金流部位", "保留 1 成戰術資金防黑天鵝"],
-    "neutral": ["維持既有配置，不追高也不殺低", "新資金分批進場、拉長時間", "盯緊 VIX 與台幣動能的方向"],
-    "defensive": ["提高台幣現金與短債比重", "暫停加碼成長股，等訊號轉好", "月配息部位續抱，當作防震墊"],
+    "offensive": ["股票比重分 2～3 次往上調 5～10%", "優先加碼核心長抱標的 (大盤 ETF、權值股)", "保留約一成現金，遇到大跌再分批"],
+    "neutral": ["維持目前的股票 / 現金比例", "定期定額照常扣款，不額外加碼", "漲多的資產賣一點、調回原本比例 (再平衡)"],
+    "defensive": ["股票比重往下調 5～10%，轉入現金或短債", "核心長抱部位不動，先減碼短線或高波動部位", "暫停額外加碼，等機會分數回到 45 以上"],
 }
-LABELS = {"offensive": "進攻", "neutral": "中性", "defensive": "防守"}
-HEADLINES = {
-    "offensive": "風險偏好回溫，資金面支持股市",
-    "neutral": "多空拉鋸，市場方向未明",
-    "defensive": "風險升溫，資金面偏空",
-}
+LABELS = {"offensive": "加碼", "neutral": "維持", "defensive": "減碼"}
 
 
-def market_verdict(df, health, bottom_fishing):
+def _headline(stance, risk):
+    stormy = risk >= 65
+    return {
+        ("offensive", True): "市場動盪，但 3 個月勝率偏高",
+        ("offensive", False): "風險平穩，3 個月勝率偏高",
+        ("neutral", True): "波動劇烈、勝率普通：守住核心，不追不殺",
+        ("neutral", False): "市場平穩、勝率普通：維持配置",
+        ("defensive", True): "風險高、勝率低，先求自保",
+        ("defensive", False): "表面平靜，但 3 個月勝率偏低",
+    }[(stance, stormy)]
+
+
+def market_verdict(df, scores, bottom_fishing=None):
+    """依「3 個月機會分數」決定加碼 / 維持 / 減碼，「風險溫度」決定口吻與節奏。"""
     drivers = collect_drivers(df)
-    bad = sum(x.tone == "bad" for x in drivers)
-    good = sum(x.tone == "good" for x in drivers)
-    met = bottom_fishing.met if bottom_fishing else 0
+    opp = scores.opportunity if scores else 50
+    risk = scores.risk if scores else 50
 
-    if met >= 3 and health.score >= 40:
+    if opp >= 55:
         stance = "offensive"
-    elif health.score >= 60 and bad <= 2:
-        stance = "offensive"
-    elif health.score < 35 or bad >= 4 or bad - good >= 3:
+    elif opp < 35:
         stance = "defensive"
     else:
         stance = "neutral"
+
+    actions = list(ACTIONS[stance])
+    if stance == "offensive" and risk >= 65:
+        actions[2] = "風險溫度高：每次加碼間隔拉長，不要一次重押"
+    if bottom_fishing and bottom_fishing.met >= 3:
+        actions.append(f"四大長線買點已成立 {bottom_fishing.met}/4，長債也可分批布局")
 
     # 利空與利多都列，但讓「與立場同方向」的排前面
     lead = "bad" if stance == "defensive" else "good" if stance == "offensive" else None
     drivers.sort(key=lambda x: x.tone != lead)
 
-    reasons = "、".join(x.short for x in drivers[:3]) or "各項指標多在常態區間"
-    one_liner = (f"今日台股{LABELS[stance]}：{reasons}，健康度 {health.score} 分、"
-                 f"長線買點 {met}/4 成立 —— 建議{ACTIONS[stance][0]}。")
-    return Verdict(stance, LABELS[stance], HEADLINES[stance], ACTIONS[stance], [asdict(x) for x in drivers], one_liner)
+    odds = scores.odds if scores else None
+    odds_txt = f"，歷史上類似分數 3 個月後上漲機率約 {odds['upProb']}%" if odds else ""
+    one_liner = (f"今日台股建議{LABELS[stance]}：3 個月機會分數 {opp}、風險溫度 {risk}{odds_txt}"
+                 f" —— {actions[0]}。")
+    return Verdict(stance, LABELS[stance], _headline(stance, risk), actions, [asdict(x) for x in drivers], one_liner)
 
 
 VITALS = [
