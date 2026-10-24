@@ -16,6 +16,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: APP_PASSCODE       # 互動工具 (個股健檢) 的使用密碼；不設定則工具停用
+        sync: false
       - key: FINMIND_TOKEN      # 台股籌碼數據 (finmindtrade.com 免費註冊)；雲端共用 IP 的匿名額度常被用光
         sync: false
 

@@ -19,6 +19,7 @@
 FRED_API_KEY=...
 GEMINI_API_KEY=...
 FINMIND_TOKEN=...   # 台股籌碼數據，finmindtrade.com 免費註冊 (沒有也能跑，但雲端常被限流)
+APP_PASSCODE=...    # 互動工具的使用密碼 (倉庫是公開的，所以不寫進程式)；不設定則工具停用
 ```
 
 ## 架構

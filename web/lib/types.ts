@@ -166,3 +166,33 @@ export interface OpenForecast {
   hitRate?: number;
   band?: number;
 }
+
+export interface StockBrief {
+  id: string;
+  name: string;
+  industry: string;
+}
+
+export interface StockCheck {
+  status: "ok";
+  stock: StockBrief;
+  cached: boolean;
+  model: string | null;
+  generatedAt: string;
+  error?: string;
+  market: { label: string; headline: string; opportunity: number; risk: number };
+  metrics: {
+    price: { close: number; date: string; ret1m: number | null; ret3m: number | null; ret1y: number | null; high52: number; low52: number;
+      ma200dev: number | null; vol: number; band68: [number, number]; band90: [number, number]; beta: number | null } | null;
+    revenue: { month: string; latest: number; yoy: number | null; mom: number | null; yoy3m: number | null; ytdYoy: number | null } | null;
+    income: { quarter: string; grossMargin: number | null; grossMarginYearAgo: number | null; opMargin: number | null; opMarginYearAgo: number | null;
+      epsLatest: number | null; epsTTM: number | null; epsTTMPrev: number | null; quarterRevenueYoy: number | null } | null;
+    balance: { debtRatio: number | null; currentRatio: number | null; cash: number | null } | null;
+    valuation: { pe: number | null; pePercentile: number | null; pb: number; dividendYield: number } | null;
+    flows: { foreign20d: number; trust20d: number; days: number } | null;
+  };
+  ai: {
+    summary: string; stance: "偏多" | "中性" | "偏空"; price_3m: { bear: number; base: number; bull: number } | null;
+    reasoning: string; strengths: string[]; risks: string[]; catalysts: string[]; valuation: string; for_long_term_holder: string; outsideBand: boolean;
+  } | null;
+}

@@ -7,10 +7,15 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+import math
+
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from holly import data
-from holly.ai_advisor import generate_ai_summary
+from holly import stock_check
+from holly.access import AccessError, RateLimiter, check_limits, check_passcode
+from holly.ai_advisor import ask_gemini_json, generate_ai_summary
 from holly.config import get_secret
 from holly.indicators import build_dataset
 from holly.market_clock import TPE, fetch_holidays, market_status
@@ -125,6 +130,66 @@ def market():
         taiex = {d.date(): float(v) for d, v in closes.tail(10).items()} if closes is not None else {}
         forecast = opening_forecast(status, taiex, taifex, us)
     return {"status": status, "forecast": forecast}
+
+
+# ---------- 互動工具 (需要密碼) ----------
+
+STOCK_PER_CLIENT = RateLimiter(limit=10)   # 每人每小時
+STOCK_OVERALL = RateLimiter(limit=40)      # 全站每小時 (保護 Gemini / FinMind 額度)
+_stock_results = {}                         # 股票代號 → (時間, 結果)，1 小時內所有人共用
+
+
+def _client(request):
+    # Next.js 轉發時會帶上訪客真正的 IP；直接呼叫時用連線來源
+    return request.headers.get("x-client-ip") or (request.client.host if request.client else "unknown")
+
+
+def _clean(x):
+    """JSON 不接受 NaN / Infinity：換成 null"""
+    if isinstance(x, float):
+        return None if math.isnan(x) or math.isinf(x) else x
+    if isinstance(x, dict):
+        return {k: _clean(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_clean(v) for v in x]
+    return x
+
+
+def _market_context(payload):
+    v, s = payload.get("verdict") or {}, payload.get("scores") or {}
+    return {"label": v.get("label"), "headline": v.get("headline"), "opportunity": s.get("opportunity"), "risk": s.get("risk")}
+
+
+@app.post("/api/stock-check")
+def stock_check_api(request: Request, body: dict = Body(...)):
+    client = _client(request)
+    try:
+        check_passcode(body.get("passcode"), client)
+        query = str(body.get("query") or "").strip()[:30]
+        if not query:
+            raise AccessError(400, "請輸入公司名稱或股票代號。")
+        try:
+            stock, candidates = stock_check.resolve(query, stock_check.stock_list())
+        except Exception as e:
+            raise AccessError(502, f"股票清單暫時抓不到，請稍後再試。({str(e)[:80]})")
+        if candidates:
+            return {"status": "ambiguous", "candidates": candidates}
+        if stock is None:
+            raise AccessError(404, f"找不到「{query}」，可以改用股票代號試試 (例如 6531)。")
+
+        hit = _stock_results.get(stock["id"])
+        if hit and time.time() - hit[0] < stock_check.RESULT_TTL and not hit[1].get("error"):
+            return _clean({"status": "ok", **hit[1], "cached": True})
+
+        check_limits(client, STOCK_PER_CLIENT, STOCK_OVERALL, "個股健檢")
+        dataset, dash = cache.get()
+        taiex = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
+        metrics = stock_check.compute_metrics(stock_check.fetch_stock_data(stock["id"]), taiex)
+        result = stock_check.analyze(stock, metrics, _market_context(dash), get_secret("GEMINI_API_KEY"), ask_gemini_json)
+        _stock_results[stock["id"]] = (time.time(), result)
+        return _clean({"status": "ok", **result, "cached": False})
+    except AccessError as e:
+        return JSONResponse({"detail": e.message}, status_code=e.status)
 
 
 @app.post("/api/ai")

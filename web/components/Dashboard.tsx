@@ -9,11 +9,13 @@ import MetricCard from "./MetricCard";
 import { Reveal } from "./Parallax";
 import { RangeProvider, RangeToggle } from "./RangeContext";
 import SectionNav from "./SectionNav";
+import ToolsPanel from "./tools/ToolsPanel";
 
 /** 抓後端數據並組裝整頁 (Server Component，外層用 <Suspense> 包住) */
 export default async function Dashboard() {
   const data = await getDashboard();
   const navItems = [
+    { id: "tools", label: "🧰 個股健檢" },
     { id: "ai", label: "AI 解析" },
     { id: "scores", label: "雙分數" },
     { id: "signals", label: "買點信號" },
@@ -24,6 +26,9 @@ export default async function Dashboard() {
   return (
     <RangeProvider>
       <Hero data={data} />
+      <div className="mx-auto mb-8 w-full max-w-[1400px] px-4 sm:px-6">
+        <ToolsPanel />
+      </div>
       <SectionNav items={navItems} />
 
       <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-16 px-4 pt-10 sm:px-6">
