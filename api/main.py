@@ -13,7 +13,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from holly import data
-from holly import stock_check
+from holly import portfolio_check, stock_check
 from holly.access import AccessError, RateLimiter, check_limits, check_passcode
 from holly.ai_advisor import ask_gemini_json, generate_ai_summary
 from holly.config import get_secret
@@ -157,7 +157,8 @@ def _clean(x):
 
 def _market_context(payload):
     v, s = payload.get("verdict") or {}, payload.get("scores") or {}
-    return {"label": v.get("label"), "headline": v.get("headline"), "opportunity": s.get("opportunity"), "risk": s.get("risk")}
+    return {"label": v.get("label"), "headline": v.get("headline"), "actions": v.get("actions"),
+            "opportunity": s.get("opportunity"), "risk": s.get("risk")}
 
 
 @app.post("/api/stock-check")
@@ -188,6 +189,30 @@ def stock_check_api(request: Request, body: dict = Body(...)):
         result = stock_check.analyze(stock, metrics, _market_context(dash), get_secret("GEMINI_API_KEY"), ask_gemini_json)
         _stock_results[stock["id"]] = (time.time(), result)
         return _clean({"status": "ok", **result, "cached": False})
+    except AccessError as e:
+        return JSONResponse({"detail": e.message}, status_code=e.status)
+
+
+PORTFOLIO_PER_CLIENT = RateLimiter(limit=5)
+PORTFOLIO_OVERALL = RateLimiter(limit=15)
+
+
+@app.post("/api/portfolio-check")
+def portfolio_check_api(request: Request, body: dict = Body(...)):
+    """持股資料只在這次請求中使用，不寫入任何地方、不快取結果。"""
+    client = _client(request)
+    try:
+        check_passcode(body.get("passcode"), client)
+        try:
+            holdings, cash = portfolio_check.parse_holdings(body.get("holdings"), body.get("cash"), stock_check.stock_list())
+        except portfolio_check.PortfolioInputError as e:
+            raise AccessError(400, str(e))
+        check_limits(client, PORTFOLIO_PER_CLIENT, PORTFOLIO_OVERALL, "配置健檢")
+        dataset, dash = cache.get()
+        taiex = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
+        portfolio_check.enrich(holdings, portfolio_check.fetch_light, taiex)
+        result = portfolio_check.analyze(holdings, cash, body.get("goal"), _market_context(dash), get_secret("GEMINI_API_KEY"), ask_gemini_json)
+        return _clean({"status": "ok", **result})
     except AccessError as e:
         return JSONResponse({"detail": e.message}, status_code=e.status)
 

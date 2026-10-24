@@ -196,3 +196,31 @@ export interface StockCheck {
     reasoning: string; strengths: string[]; risks: string[]; catalysts: string[]; valuation: string; for_long_term_holder: string; outsideBand: boolean;
   } | null;
 }
+
+export interface PortfolioHolding {
+  id: string; name: string; industry: string; weight: number; isEtf: boolean; isBond: boolean;
+  ret3m: number | null; ret1y: number | null; vol: number | null; beta: number | null; ma200dev: number | null;
+  pe: number | null; dividendYield: number | null;
+}
+
+export interface PortfolioCheck {
+  status: "ok";
+  holdings: PortfolioHolding[];
+  cash: number;
+  goal: string;
+  model: string | null;
+  error?: string;
+  market: { label: string; headline: string; opportunity: number; risk: number };
+  metrics: {
+    equity: number; cash: number; stockLike: number; bond: number; etfWeight: number;
+    topHolding: { name: string; weight: number }; effectiveN: number; beta: number | null; avgVol: number | null;
+    dividendYield: number | null; industries: Record<string, number>;
+  };
+  ai: {
+    summary: string; risk_level: string; fit_with_market: string; strengths?: string[]; issues: string[];
+    suggestions: { action: string; target: string; detail: string }[];
+    suggested_weights: { name: string; current: number; suggested: number }[];
+    next_steps: string[];
+    stanceCheck: { change: number; allowed: [number, number]; ok: boolean } | null;
+  } | null;
+}

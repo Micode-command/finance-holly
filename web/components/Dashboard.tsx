@@ -15,7 +15,7 @@ import ToolsPanel from "./tools/ToolsPanel";
 export default async function Dashboard() {
   const data = await getDashboard();
   const navItems = [
-    { id: "tools", label: "🧰 個股健檢" },
+    { id: "tools", label: "🧰 互動工具" },
     { id: "ai", label: "AI 解析" },
     { id: "scores", label: "雙分數" },
     { id: "signals", label: "買點信號" },

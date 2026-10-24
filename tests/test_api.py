@@ -101,3 +101,23 @@ def test_every_card_has_glossary_terms_that_exist(client):
     for card in (c for s in body["sections"] for c in s["cards"]):
         assert card["terms"], f"{card['id']} 沒有對應名詞"
         assert set(card["terms"]) <= ids, f"{card['id']} 對應到不存在的名詞 {set(card['terms']) - ids}"
+
+
+def test_market_download_retries_then_reports(monkeypatch):
+    import pandas as pd
+    from holly import data as d
+    calls = {"n": 0}
+
+    def flaky(ticker, period=None, progress=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return pd.DataFrame()                                   # 前兩次 Yahoo 回空資料
+        return pd.DataFrame({"Close": [1.0, 2.0]}, index=pd.DatetimeIndex(["2026-10-21", "2026-10-22"]))
+
+    monkeypatch.setattr(d.yf, "download", flaky)
+    monkeypatch.setattr(d.time, "sleep", lambda s: None)
+    assert list(d._download_close("^TWII", 1)) == [1.0, 2.0] and calls["n"] == 3
+
+    monkeypatch.setattr(d.yf, "download", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(d, "YF_TICKERS", {"TAIEX": "^TWII"})
+    assert d.fetch_market(1).empty and "TAIEX" in d.MARKET_ERRORS

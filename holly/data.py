@@ -53,19 +53,38 @@ def fetch_fred(key, years_back=YEARS_BACK):
     return pd.concat(series, axis=1, sort=True) if series else pd.DataFrame()
 
 
-def fetch_market(years_back=YEARS_BACK):
-    series = []
-    for name, ticker in YF_TICKERS.items():
+# 最近一次市場數據下載失敗的代號 (給 API 回報)
+MARKET_ERRORS = {}
+
+
+def _download_close(ticker, years_back, attempts=3):
+    """Yahoo 偶爾會回空資料或暫時限流：失敗就間隔幾秒重試。"""
+    last_error = "空資料"
+    for i in range(attempts):
         try:
             hist = yf.download(ticker, period=f"{years_back}y", progress=False)
-            if hist.empty or "Close" not in hist.columns:
-                continue
-            s = hist["Close"]
-            if isinstance(s, pd.DataFrame):
-                s = s.iloc[:, 0]
-            s.index = s.index.tz_localize(None)
-            series.append(s.rename(name))
+            if not hist.empty and "Close" in hist.columns:
+                s = hist["Close"]
+                if isinstance(s, pd.DataFrame):
+                    s = s.iloc[:, 0]
+                s = s.dropna()
+                if not s.empty:
+                    s.index = s.index.tz_localize(None)
+                    return s
         except Exception as e:
+            last_error = f"{type(e).__name__}: {str(e)[:120]}"
+        time.sleep(2 * (i + 1))
+    raise RuntimeError(last_error)
+
+
+def fetch_market(years_back=YEARS_BACK):
+    series = []
+    MARKET_ERRORS.clear()
+    for name, ticker in YF_TICKERS.items():
+        try:
+            series.append(_download_close(ticker, years_back).rename(name))
+        except Exception as e:
+            MARKET_ERRORS[name] = str(e)
             print(f"⚠️ yfinance 抓取失敗 [{name}]: {e}")
     return pd.concat(series, axis=1, sort=True) if series else pd.DataFrame()
 
