@@ -9,6 +9,7 @@ from holly.commentary import macro_commentary
 from holly.indicators import cycle_pr, growth_pr
 from holly.news import market_moving_news
 from holly.scores import market_scores
+from holly.taiwan import LAST_ERRORS
 from holly.signals import bottom_fishing_signals, regime_probabilities
 from holly.verdict import market_verdict, vitals
 
@@ -101,6 +102,7 @@ def dashboard_payload(dataset, news_items=()):
         "asOf": _date(df.index[-1]),
         "missingFred": dataset.missing_fred,
         "missingTw": dataset.missing_tw,
+        "dataErrors": dict(LAST_ERRORS),
         "verdict": asdict(verdict),
         "vitals": [{**v, "value": _num(v["value"]), "change": _num(v["change"])} for v in vitals(dataset)],
         "regime": regime_probabilities(df),

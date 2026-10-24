@@ -23,6 +23,9 @@ YI = 1e8  # 1 億
 # 月資料「M 月」約在 M+1 月下旬公布；保守起見 M+2 月 1 日才採用 (回測也用同樣規則，避免偷看未來)
 MONTHLY_RELEASE_LAG = pd.DateOffset(months=2)
 
+# 最近一次下載各來源的錯誤訊息 (給 API 回報，方便在雲端除錯)
+LAST_ERRORS = {}
+
 TW_COLUMNS = ["TW_Foreign_Net", "TW_Foreign_Net_20D", "TW_Trust_Net_20D", "TW_Margin", "TW_Margin_Chg20",
               "TW_Fut_Foreign_OI", "TW_PE_TSMC", "TW_NDC_Score", "TW_NDC_Leading_Chg3", "TW_Export_YoY"]
 
@@ -63,10 +66,12 @@ def fetch_taiwan(years_back):
         "exports": _export_orders_table,
     }
     got = {}
+    LAST_ERRORS.clear()
     for name, fetch in sources.items():
         try:
             got[name] = fetch()
         except Exception as e:
+            LAST_ERRORS[name] = f"{type(e).__name__}: {str(e)[:200]}"
             print(f"⚠️ 台股數據抓取失敗 [{name}]: {e}")
         if name in ("inst", "margin", "fut", "per"):
             time.sleep(1.0)  # 免費 API，請求間隔一下
