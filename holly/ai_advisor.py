@@ -77,25 +77,34 @@ def generate_ai_summary(df, api_key, context=None):
         result["error"] = "請在 .env 設定 GEMINI_API_KEY"
         return result
 
+    contents = PROMPT_TEMPLATE + "\n\n" + build_data_summary(df, pr, fetch_headlines(), context)
+    try:
+        ai_json, model = ask_gemini_json(contents, api_key)
+    except RuntimeError as e:
+        result["error"] = str(e)
+        return result
+    # AI 的文字覆蓋預設提示，但機率永遠以 Python 量化矩陣為準
+    return {**result, **ai_json, **{k: result[k] for k in PROB_KEYS}, "model": model}
+
+
+def ask_gemini_json(prompt, api_key, temperature=0.1):
+    """呼叫 Gemini 並要求回傳 JSON 物件；強的模型忙線 / 額度用完時自動改用下一個。
+    成功回傳 (dict, 模型名稱)，全部失敗則丟出 RuntimeError。"""
     # client 必須用變數持有：若寫成 genai.Client(...).models.generate_content(...)，
     # client 會在請求送出前被回收並關閉連線 ("client has been closed")
     client = genai.Client(api_key=api_key)
-    contents = PROMPT_TEMPLATE + "\n\n" + build_data_summary(df, pr, fetch_headlines(), context)
     errors = []
-    for model in GEMINI_MODELS:  # 強的模型忙線 / 額度用完時，自動改用下一個
+    for model in GEMINI_MODELS:
         try:
             response = client.models.generate_content(
                 model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1),
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=temperature),
             )
-            ai_json = json.loads((response.text or "").strip() or "{}")
-            if not isinstance(ai_json, dict):
+            data = json.loads((response.text or "").strip() or "{}")
+            if not isinstance(data, dict):
                 raise ValueError("AI 回傳格式不是 JSON 物件")
-            # AI 的文字覆蓋預設提示，但機率永遠以 Python 量化矩陣為準
-            return {**result, **ai_json, **{k: result[k] for k in PROB_KEYS}, "model": model}
+            return data, model
         except Exception as e:
             errors.append(f"{model}: {str(e)[:120]}")
-
-    result["error"] = "AI 暫時無法連線，所有模型都失敗：" + "；".join(errors)
-    return result
+    raise RuntimeError("AI 暫時無法連線，所有模型都失敗：" + "；".join(errors))

@@ -51,7 +51,7 @@ function Gauge({ score, color, label, term }: { score: number; color: string; la
   const r = 52;
   const c = 2 * Math.PI * r;
   return (
-    <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`${label} ${score} 分`}>
+    <div className="relative h-28 w-28 shrink-0 sm:h-32 sm:w-32" role="img" aria-label={`${label} ${score} 分`}>
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--neutral)" strokeWidth="8" />
         <circle
@@ -182,9 +182,10 @@ export default function Hero({ data }: { data: Dashboard }) {
           <div className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8 lg:col-span-7">
             <div className="scanline pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-accent/5 to-transparent" />
             <p className="font-mono text-xs tracking-[0.25em] text-muted">今日市場狀態 · {s.tag}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-6">
+            {/* 手機：結論文字在上、儀表在下；平板以上才左右並排 */}
+            <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
               <div className="min-w-0 flex-1">
-                <p className={`glow-text text-6xl font-black sm:text-7xl ${s.text}`}>
+                <p className={`glow-text text-5xl font-black sm:text-7xl ${s.text}`}>
                   {s.icon} {v.label}
                 </p>
                 <p className="mt-3 text-xl font-semibold sm:text-2xl">{v.headline}</p>
@@ -196,7 +197,7 @@ export default function Hero({ data }: { data: Dashboard }) {
                 )}
               </div>
               {data.scores && (
-                <div className="flex gap-3">
+                <div className="flex justify-center gap-3 sm:justify-end">
                   <Gauge score={data.scores.opportunity} color={s.ring} label="3 個月機會" term="opportunity_score" />
                   <Gauge score={data.scores.risk} color={data.scores.risk >= 65 ? "var(--bad)" : data.scores.risk >= 35 ? "var(--warn)" : "var(--good)"} label="風險溫度" term="risk_score" />
                 </div>
