@@ -115,6 +115,19 @@ def screen(cur, pe_hist, rev_hist, latest_month, latest_rev):
     return passed, funnel, latest_month
 
 
+def valid_themes(themes, n_headlines):
+    """程式驗證「每個趨勢至少 2 則不同新聞支持」：AI 有時不照規則，只憑 1 則新聞就列成趨勢。"""
+    out = []
+    for th in themes or []:
+        try:
+            sources = {int(s) for s in th.get("sources") or [] if 1 <= int(s) <= n_headlines}
+        except (TypeError, ValueError):
+            continue
+        if len(sources) >= 2 and th.get("name"):
+            out.append({**th, "sources": sorted(sources)})
+    return out
+
+
 INORGANIC = re.compile(r"併購|合併|收購|納入.{0,12}子公司|新增.{0,6}子公司")
 
 
@@ -136,14 +149,14 @@ B. 判斷每一檔「候選股」(已通過營收與估值篩選) 和哪個趨�
    business 用一句話描述公司主要業務；若不確定，請寫「不確定」，不要猜。
 只輸出 JSON，字串內不要換行：
 {
-  "themes": [{"name": "<趨勢名稱>", "demand": "<需求升溫的證據，引用 2 則以上新聞>", "watch": "<要留意的風險>"}],
+  "themes": [{"name": "<趨勢名稱>", "sources": [<支持這個趨勢的新聞編號，至少 2 個>], "demand": "<需求升溫的證據，引用新聞>", "watch": "<要留意的風險>"}],
   "stocks": {"<股票代號>": {"theme": "<趨勢名稱或 null>", "relation": "<direct|indirect|none>", "business": "<主要業務>", "why": "<判斷理由，30 字內>"}}
 }
 """
 
 
 def build_prompt(headlines, candidates):
-    lines = [PROMPT, "【近期新聞標題】"] + [f"- {h}" for h in headlines[:60]]
+    lines = [PROMPT, "【近期新聞標題】"] + [f"{i}. {h}" for i, h in enumerate(headlines[:60], 1)]
     lines.append("\n【候選股】")
     for code, r in candidates.iterrows():
         note = f"；公司說明：{r['note'][:60]}" if r.get("note") else ""
@@ -162,8 +175,10 @@ def build_radar(cur, pe_hist, rev_hist, latest_month, latest_rev, headlines, api
             ai, result["model"] = ask(build_prompt(headlines, passed.head(25)), api_key)
         except Exception as e:
             result["error"] = f"AI 趨勢分析暫時失敗，以下只顯示數據篩選結果。({str(e)[:120]})"
-    result["themes"] = ai.get("themes") or []
-    tags = ai.get("stocks") or {}
+    result["themes"] = valid_themes(ai.get("themes"), len(headlines[:60]))
+    names = {th["name"] for th in result["themes"]}
+    # 被刪掉的趨勢 (新聞支持不足)，掛在上面的股票標籤也一併拿掉
+    tags = {code: t if t.get("theme") in names else {**t, "theme": None, "relation": "none"} for code, t in (ai.get("stocks") or {}).items()}
     stocks = []
     for code, r in passed.iterrows():
         t = tags.get(code) or {}

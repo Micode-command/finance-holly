@@ -59,7 +59,8 @@ def test_parse_current():
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(data, "load_raw", make_raw)
-    monkeypatch.setattr(data, "fetch_market_news", lambda: [{"title": "AI 伺服器需求強勁", "link": "x", "published": None, "source": "t"}])
+    monkeypatch.setattr(data, "fetch_market_news", lambda: [{"title": "AI 伺服器需求強勁", "link": "x", "published": None, "source": "t"},
+                                                               {"title": "雲端廠擴大 AI 資本支出", "link": "y", "published": None, "source": "t"}])
     world = _world()
     monkeypatch.setattr(radar, "fetch_current", lambda: (world[0], world[3], world[4]))
     monkeypatch.setattr(radar, "load_snapshots", lambda: (world[1], world[2]))
@@ -67,7 +68,7 @@ def client(monkeypatch):
 
     def fake_ai(prompt, key):
         prompts.append(prompt)
-        return {"themes": [{"name": "AI 伺服器", "demand": "新聞", "watch": "估值"}],
+        return {"themes": [{"name": "AI 伺服器", "sources": [1, 2], "demand": "新聞", "watch": "估值"}],
                 "stocks": {"1111": {"theme": "AI 伺服器", "relation": "direct", "business": "測試", "why": "營收成長"}}}, "fake"
 
     monkeypatch.setattr(main, "ask_gemini_json", fake_ai)
@@ -93,8 +94,8 @@ def test_radar_api_shared_result(client):
 
 def test_indirect_theme_not_shown_as_main_tag():
     world = _world()
-    ask = lambda prompt, key: ({"themes": [], "stocks": {"1111": {"theme": "AI", "relation": "indirect"}}}, "fake")
-    r = radar.build_radar(world[0], world[1], world[2], world[3], world[4], ["新聞"], "key", ask)
+    ask = lambda prompt, key: ({"themes": [{"name": "AI", "sources": [1, 2]}], "stocks": {"1111": {"theme": "AI", "relation": "indirect"}}}, "fake")
+    r = radar.build_radar(world[0], world[1], world[2], world[3], world[4], ["新聞一", "新聞二"], "key", ask)
     assert r["stocks"][0]["theme"] is None and r["stocks"][0]["indirectTheme"] == "AI"
 
 
@@ -102,3 +103,13 @@ def test_inorganic_growth_flagged_and_empty_notes_hidden():
     assert radar.clean_note("-") is None and radar.clean_note(" ") is None
     assert radar.INORGANIC.search("主係自115年8月底納入重要子公司FDK株式會社之營收")
     assert not radar.INORGANIC.search("因客戶需求增加，致使營收增加")
+
+
+def test_themes_need_two_distinct_headlines_and_orphan_tags_removed():
+    world = _world()
+    ai = {"themes": [{"name": "防詐", "sources": [3]}, {"name": "防詐2", "sources": [3, 3]}, {"name": "AI", "sources": [1, 2]},
+                     {"name": "幻覺", "sources": [99, 100]}],
+          "stocks": {"1111": {"theme": "防詐", "relation": "direct"}}}
+    r = radar.build_radar(world[0], world[1], world[2], world[3], world[4], ["a", "b", "c"], "key", lambda p, k: (ai, "m"))
+    assert [t["name"] for t in r["themes"]] == ["AI"]                    # 只有 1 則、重複、或不存在的編號都不算
+    assert r["stocks"][0]["theme"] is None                              # 掛在被刪趨勢上的標籤拿掉
