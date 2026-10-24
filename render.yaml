@@ -2,7 +2,7 @@
 # 用法：Render 後台 → New → Blueprint → 選這個 GitHub 倉庫
 services:
   - type: web
-    name: holly-api
+    name: finance-holly-api
     runtime: python
     plan: free
     region: singapore          # 離台灣最近
@@ -18,7 +18,7 @@ services:
         sync: false
 
   - type: web
-    name: holly-web
+    name: finance-holly-web
     runtime: node
     plan: free
     region: singapore
@@ -28,5 +28,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24"
-      - key: API_URL            # 填後端網址，例如 https://holly-api.onrender.com
+      - key: API_URL            # 填後端網址，例如 https://finance-holly-api.onrender.com
         sync: false

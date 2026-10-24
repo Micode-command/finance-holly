@@ -55,12 +55,12 @@ cd web && npx tsc --noEmit && npm run lint && npm run build   # 前端
 
 ## 部署 (Render)
 
-`render.yaml` 會一次建立兩個服務：`holly-api` (Python) 與 `holly-web` (Next.js)。
+`render.yaml` 會一次建立兩個服務：`finance-holly-api` (Python) 與 `finance-holly-web` (Next.js)。
 
 1. 把專案推到 GitHub (`.env` 已被排除，金鑰不會上傳)
 2. Render 後台 → **New → Blueprint** → 選這個倉庫 → 依提示貼上 `FRED_API_KEY`、`GEMINI_API_KEY`
-3. `API_URL` 填後端網址 (例如 `https://holly-api.onrender.com`，以 Render 顯示的為準)
-4. 部署完成後打開 `holly-web` 的網址即可分享
+3. `API_URL` 填後端網址 (例如 `https://finance-holly-api.onrender.com`，以 Render 顯示的為準)
+4. 部署完成後打開 `finance-holly-web` 的網址即可分享
 
 公開網站的保護：AI 解析每次數據更新只產生一次、所有訪客共用；「強制重新抓取」有 10 分鐘冷卻。
 
