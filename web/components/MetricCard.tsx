@@ -1,4 +1,4 @@
-import { changeTone, formatChange, formatValue, prBand } from "@/lib/format";
+import { changeTone, formatChange, formatValue, prBand, prBandNeutral } from "@/lib/format";
 import { TERM_BY_ID } from "@/lib/glossary";
 import type { Card } from "@/lib/types";
 import TrendChart from "./TrendChart";
@@ -6,10 +6,18 @@ import TrendChart from "./TrendChart";
 const TONE_TEXT = { good: "text-good-text", bad: "text-bad", flat: "text-muted" } as const;
 const TONE_ICON = { good: "▲", bad: "▼", flat: "■" } as const;
 
+/** 變化量的單位：價格類是 %；利率、百分比類是「百分點」；其他用卡片本身的單位 (億、口、分、兆) */
+function changeUnit(card: Card) {
+  if (card.changeMode === "pct") return "%";
+  const unit = card.suffix.trim();
+  if (unit === "%" || unit.includes("百分點")) return "百分點";
+  return unit || "增減";
+}
+
 function ChangeChips({ card }: { card: Card }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] text-muted">變化{card.changeMode === "abs" ? " (百分點)" : " (%)"}</p>
+      <p className="mb-1 text-[11px] text-muted">變化 ({changeUnit(card)})</p>
     <dl className="grid grid-cols-3 gap-1.5">
       {card.changes?.map((c) => {
         const tone = c.value == null ? "flat" : changeTone(card, c.value);
@@ -37,8 +45,8 @@ const BAND_FILL = {
 } as const;
 
 /** PR 位階條：0-100 的位置 + 文字標籤 (不只靠顏色) */
-function PrMeter({ label, value }: { label: string; value: number }) {
-  const band = prBand(value);
+function PrMeter({ label, value, neutral }: { label: string; value: number; neutral?: boolean }) {
+  const band = neutral ? { label: prBandNeutral(value), tone: "neutral" as const } : prBand(value);
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between text-[11px]">
@@ -52,7 +60,7 @@ function PrMeter({ label, value }: { label: string; value: number }) {
         <div className="absolute inset-y-0 left-[80%] w-px bg-surface" />
         <div className="absolute inset-y-0 left-[90%] w-px bg-surface" />
         <div
-          className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${BAND_FILL[band.tone]}`}
+          className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${neutral ? "bg-accent" : BAND_FILL[band.tone]}`}
           style={{ left: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
@@ -137,7 +145,7 @@ export default function MetricCard({ card }: { card: Card }) {
 
       {card.percentiles && card.percentiles.length > 0 && (
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${card.percentiles.length}, minmax(0, 1fr))` }}>
-          {card.percentiles.map((p) => p.value != null && <PrMeter key={p.label} label={p.label} value={p.value} />)}
+          {card.percentiles.map((p) => p.value != null && <PrMeter key={p.label} label={p.label} value={p.value} neutral={card.prNeutral} />)}
         </div>
       )}
       <Explanation card={card} />

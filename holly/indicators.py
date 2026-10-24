@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from .config import FRED_SERIES
+from .taiwan import TW_COLUMNS
 
 # 衍生指標 → 原始欄位，用來顯示「真正的」資料公布日期 (多個來源時取最舊的)
 DATE_SOURCES = {
@@ -24,6 +25,7 @@ class Dataset:
     raw: pd.DataFrame = None            # 原始表 (含 NaN)，用來判斷哪天有真的公布數據
     obs_dates: dict = field(default_factory=dict)
     missing_fred: list = field(default_factory=list)
+    missing_tw: list = field(default_factory=list)
 
     def last_date(self, column):
         """指標真正的最後公布日；找不到來源時退回表格最後一列的日期。"""
@@ -61,12 +63,13 @@ def build_dataset(raw):
     """
     obs_dates = {c: raw[c].last_valid_index() for c in raw.columns}
     missing_fred = [c for c in FRED_SERIES if c not in raw.columns]
+    missing_tw = [c for c in TW_COLUMNS if c not in raw.columns]
 
     df = raw.ffill()
     if "SPY" in raw.columns:
         df = df[raw["SPY"].notna()]
     df = add_indicators(df.copy())
-    return Dataset(df=df, raw=raw, obs_dates=obs_dates, missing_fred=missing_fred)
+    return Dataset(df=df, raw=raw, obs_dates=obs_dates, missing_fred=missing_fred, missing_tw=missing_tw)
 
 
 def _has(df, *cols):

@@ -19,6 +19,7 @@ export interface Card {
   suffix: string;
   changeMode: "pct" | "abs";
   defaultRange: Range;
+  prNeutral: boolean;
   refLines: { value: number; label: string }[];
   terms: string[];
   available: boolean;
@@ -115,6 +116,7 @@ export interface BottomFishing {
 export interface Dashboard {
   asOf: string;
   missingFred: string[];
+  missingTw: string[];
   aiEnabled: boolean;
   verdict: Verdict;
   vitals: Vital[];

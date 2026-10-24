@@ -6,6 +6,8 @@
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+import pandas as pd
+
 
 @dataclass
 class CardSpec:
@@ -23,11 +25,16 @@ class CardSpec:
     suffix: str = ""
     ref_lines: list = field(default_factory=list)   # [(數值, 說明)] 圖上的門檻線
     note: Optional[Callable] = None     # (dataset) -> str，動態補充說明
+    change: Optional[str] = None        # 強制指定變化的算法："abs" 增減量 / "pct" 漲跌 %
+    pr_neutral: bool = False            # 歷史位階只標「極高～極低」，不暗示好壞 (買賣超、成長率這類)
 
     @property
     def change_mode(self):
-        """利率、百分比類看「增減幾個百分點」，價格類看「漲跌幾 %」。"""
-        return "abs" if ("%" in self.suffix or "百分點" in self.suffix) else "pct"
+        """利率、百分比、買賣超類看「增減多少」，價格類看「漲跌幾 %」。"""
+        # 買賣超金額、口數會在正負之間跳動，算「漲跌 %」沒有意義，也看增減量
+        if self.change:
+            return self.change
+        return "abs" if any(u in self.suffix for u in ("%", "百分點", "億", "口", "分")) else "pct"
 
 
 @dataclass
@@ -45,6 +52,34 @@ def explain(formula, threshold, impact, threshold_label="閾值"):
 
 def tip(summary, hint):
     return {"kind": "tip", "summary": summary, "hint": hint}
+
+
+def _latest_flow_note(dataset):
+    v = dataset.latest("TW_Foreign_Net")
+    return None if v is None else f"最新一日外資 {'買超' if v >= 0 else '賣超'} {abs(v):,.0f} 億"
+
+
+def _margin_note(dataset):
+    v = dataset.latest("TW_Margin")
+    return None if v is None else f"融資餘額 {v:,.0f} 億"
+
+
+def _monthly_note(column):
+    def note(dataset):
+        d = dataset.last_date(column)
+        return None if d is None else f"{(d - pd.DateOffset(months=2)):%Y 年 %-m 月}的數據 (公布後才採用)"
+    return note
+
+
+NDC_LIGHTS = [(38, "紅燈 (景氣過熱)"), (32, "黃紅燈 (轉熱)"), (23, "綠燈 (穩定)"), (17, "黃藍燈 (轉弱)"), (0, "藍燈 (低迷)")]
+
+
+def _ndc_note(dataset):
+    v = dataset.latest("TW_NDC_Score")
+    if v is None:
+        return None
+    light = next(name for floor, name in NDC_LIGHTS if v >= floor)
+    return f"{light} · " + (_monthly_note("TW_NDC_Score")(dataset) or "")
 
 
 def _sahm_note(dataset):
@@ -98,6 +133,32 @@ SECTIONS = [
         CardSpec("Copper", "銅博士期貨", explain("全球工業金屬之母。", "長線受基建與 AI 需求推動。", "銅價大漲代表實體經濟(拉貨)熱絡；暴跌暗示全球需求萎縮。"), pr_type="G", prefix="$"),
         CardSpec("USDTWD", "美元兌台幣", explain("台幣匯率。", "C-PR > 80 台幣嚴重貶值。", "向上(貶值)代表外資賣台股匯出；向下(升值)代表熱錢湧入買台股。"), invert_color=True),
     ]),
+    Section("🇹🇼 台股籌碼與景氣", nav="台股籌碼", intro="外資、投信、散戶 (融資) 怎麼在買賣，以及台灣的景氣與出口接單。★ = 回測證實有用，已放進雙分數；其餘只用來解釋現況。", cards=[
+        CardSpec("TW_Foreign_Net_20D", "外資 20 日累計買賣超",
+                 tip("外資近 20 個交易日合計買 (+) 或賣 (−) 了多少台股。", "★ 已放進風險溫度：外資連續大賣時，台股接下來通常比較震盪。但回測 10 年發現，它「無法預測」3 個月後是漲是跌 (有時繼續跌、有時馬上反彈)，所以不放進機會分數。"),
+                 signed=True, decimals=0, suffix=" 億", ref_lines=[(0, "0")], note=_latest_flow_note, pr_neutral=True),
+        CardSpec("TW_Fut_Foreign_OI", "外資台指期淨未平倉",
+                 tip("外資在台指期貨「多單 − 空單」的口數，負數 = 淨空單。", "★ 已放進風險溫度：外資用期貨放空越多，台股接下來越容易大幅震盪。常被視為外資看法的領先指標，但同樣無法單獨預測 3 個月方向。"),
+                 signed=True, decimals=0, suffix=" 口", ref_lines=[(0, "0")], pr_neutral=True),
+        CardSpec("TW_Margin_Chg20", "融資餘額 20 日變化",
+                 tip("散戶借錢買股 (融資) 的總額，近 20 個交易日增減幾 %。", "★ 已放進機會分數：回測顯示融資增加時，3 個月後台股反而偏多 (代表市場動能與信心在升溫)；融資快速大減常是斷頭賣壓。"),
+                 signed=True, decimals=1, suffix="%", ref_lines=[(0, "0")], note=_margin_note, pr_neutral=True),
+        CardSpec("TW_Trust_Net_20D", "投信 20 日累計買賣超",
+                 tip("國內基金公司 (投信) 近 20 個交易日合計買賣超。", "只解釋現況：季底常有「作帳行情」。回測時方向不穩定，不放進分數。"),
+                 signed=True, decimals=0, suffix=" 億", ref_lines=[(0, "0")], pr_neutral=True),
+        CardSpec("TW_NDC_Score", "國發會景氣對策信號",
+                 explain("9 項景氣指標加總的分數 (9～45 分)，對應五種燈號。", "≥38 紅燈過熱、32～37 黃紅燈、23～31 綠燈、17～22 黃藍燈、≤16 藍燈。", "反映「現在」景氣冷熱。回測發現燈號本身對 3 個月後台股幫助不大，紅燈時股市常已經漲了一大段。"),
+                 range="3Y", decimals=0, suffix=" 分", is_macro=True, ref_lines=[(38, "38 紅燈"), (23, "23 綠燈")], note=_ndc_note),
+        CardSpec("TW_NDC_Leading_Chg3", "景氣領先指標 3 個月變化",
+                 explain("國發會領先指標 (不含趨勢) 最近 3 個月的變化。", "正數 = 未來景氣轉好，負數 = 轉弱。", "★ 已放進機會分數：回測與台股 3 個月後報酬相關約 +0.27，是台灣景氣數據中最有預測力的。"),
+                 range="3Y", signed=True, decimals=2, is_macro=True, ref_lines=[(0, "0")], note=_monthly_note("TW_NDC_Leading_Chg3"), change="abs", pr_neutral=True),
+        CardSpec("TW_Export_YoY", "外銷訂單年增率",
+                 explain("台灣廠商接到的海外訂單金額，比去年同月成長幾 %。", "正數 = 接單成長，> 20% 屬於強勁。", "★ 已放進機會分數：接單領先實際出貨 1～3 個月，電子股獲利跟著走。"),
+                 range="3Y", signed=True, decimals=1, suffix="%", is_macro=True, ref_lines=[(0, "0")], note=_monthly_note("TW_Export_YoY"), pr_neutral=True),
+        CardSpec("TW_PE_TSMC", "台積電本益比",
+                 explain("台積電股價 ÷ 近四季每股盈餘，代表買一塊錢的獲利要付幾塊錢。", "看歷史位階：越高 = 越貴。", "台積電占台股市值四成以上，它貴不貴幾乎等於大盤貴不貴。回測無法預測 3 個月方向，只當估值參考。"),
+                 decimals=1, suffix=" 倍"),
+    ]),
     Section("💣 第二/三道防線：黑天鵝與匯率戰", nav="黑天鵝", cards=[
         CardSpec("VIX", "恐慌指數 (VIX)", explain("選擇權市場避險保費。", ">20 警戒，>30 股災，<13 提防樂極生悲。", "與 SPY 完全反向，C-PR > 95 是極端恐慌的逆勢買點。"), invert_color=True, ref_lines=[(20, "20 警戒"), (30, "30 股災")]),
         CardSpec("High_Yield_Spread", "垃圾債利差", explain("垃圾債減去無風險美債利息。", ">5% 亮黃燈，>8% 企業連環倒閉。", "飆高代表銀行抽銀根，股市必暴跌，應立刻轉入現金與長債。"), invert_color=True, suffix="%", ref_lines=[(5, "5% 黃燈")]),
@@ -112,7 +173,7 @@ SECTIONS = [
     ]),
     Section("🏦 第五道防線：聯準會底層水箱", nav="Fed 水箱", cards=[
         CardSpec("Reserves_T", "銀行準備金", explain("聯準會放在銀行的閒錢。", "低於 3 兆美元代表活水枯竭。", "錢越多股市越漲；下滑趨勢確立時，美股將面臨估值下修壓力。"), suffix=" 兆", is_macro=True, ref_lines=[(3, "3 兆")]),
-        CardSpec("RRP_T", "ON RRP 備用金", explain("停泊在聯準會的超額現金。", "歸零即失去流動性保護傘。", "減少代表錢被拿去買美債了；若數字見底，股市震盪將變得極度劇烈。"), suffix=" 兆"),
+        CardSpec("RRP_T", "ON RRP 備用金", explain("停泊在聯準會的超額現金。", "歸零即失去流動性保護傘。", "減少代表錢被拿去買美債了；若數字見底，股市震盪將變得極度劇烈。"), suffix=" 兆", decimals=3, change="abs"),
         CardSpec("Liquidity_Spread", "短期資金吃緊度", explain("SOFR 減去 基準利率。", "翻正(>0)即爆發資金荒。", "代表華爾街連借錢過夜都有困難，隨時可能爆發如 2019 年 9 月附買回市場的資金荒。"), invert_color=True, signed=True, suffix="%", ref_lines=[(0, "0 資金荒")]),
         CardSpec("Yield_Curve", "長短債利差", explain("10年期 減 2年期國債利率。", "常態為正，倒掛(負數)是警報。", "真正恐怖的是「解除倒掛、由負翻正」的那一刻，通常宣告實質大股災到來。"), range="3Y", signed=True, suffix="%", invert_pr=True, ref_lines=[(0, "0 倒掛線")]),
     ]),
@@ -154,4 +215,12 @@ CARD_TERMS = {
     "Unemployment_Rate": ["unemployment"],
     "Sahm_Indicator": ["sahm", "unemployment"],
     "Core_PCE_YoY": ["pce", "cpi"],
+    "TW_Foreign_Net_20D": ["institutional_flows", "foreign_investors"],
+    "TW_Fut_Foreign_OI": ["futures_oi"],
+    "TW_Margin_Chg20": ["margin"],
+    "TW_Trust_Net_20D": ["institutional_flows"],
+    "TW_NDC_Score": ["ndc_signal"],
+    "TW_NDC_Leading_Chg3": ["leading_index"],
+    "TW_Export_YoY": ["export_orders"],
+    "TW_PE_TSMC": ["pe_ratio"],
 }

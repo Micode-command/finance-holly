@@ -33,6 +33,12 @@ export default async function Dashboard() {
           </p>
         )}
 
+        {data.missingTw.length > 0 && (
+          <p className="rounded-lg border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
+            ⚠️ 部分台股數據 (證交所 / 國發會 / 經濟部) 暫時抓不到，台股籌碼卡片可能顯示無數據，分數會用其餘因子計算：{data.missingTw.join(", ")}
+          </p>
+        )}
+
         <Reveal>
           <div id="ai" className="scroll-mt-20">
             <AiPanel enabled={data.aiEnabled} />

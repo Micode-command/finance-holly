@@ -29,6 +29,16 @@ def _latest(df, col):
     return float(s.iloc[-1]) if not s.empty else None
 
 
+def _pct_latest(df, col, window=756):
+    """最新值在過去 3 年的百分位 (0~100)"""
+    if col not in df.columns:
+        return None
+    s = df[col].dropna()
+    if len(s) < 252:
+        return None
+    return float(s.tail(window).rank(pct=True).iloc[-1] * 100)
+
+
 def _dev_from_month(df, col, window=20):
     s = df[col].dropna() if col in df.columns else None
     if s is None or len(s) < window:
@@ -74,9 +84,30 @@ def collect_drivers(df):
     if brent is not None and brent > 90:
         d.append(Driver("bad", f"布蘭特原油 ${brent:.0f}：通膨壓力未解", "油價偏高"))
 
+    fn20, fn_pct = _latest(df, "TW_Foreign_Net_20D"), _pct_latest(df, "TW_Foreign_Net_20D")
+    if fn20 is not None and fn_pct is not None:
+        if fn_pct <= 10: d.append(Driver("bad", f"外資 20 日賣超 {-fn20:,.0f} 億：籌碼面賣壓沉重 (近 3 年最重的一成)", "外資大賣"))
+        elif fn_pct >= 90: d.append(Driver("good", f"外資 20 日買超 {fn20:,.0f} 億：外資積極回補台股", "外資回補"))
+
+    oi, oi_pct = _latest(df, "TW_Fut_Foreign_OI"), _pct_latest(df, "TW_Fut_Foreign_OI")
+    if oi is not None and oi_pct is not None and oi_pct <= 10:
+        d.append(Driver("bad", f"外資台指期淨空單 {-oi:,.0f} 口：外資用期貨大量避險 / 放空", "外資期貨偏空"))
+
+    exports = _latest(df, "TW_Export_YoY")
+    if exports is not None:
+        if exports > 20: d.append(Driver("good", f"外銷訂單年增 {exports:.0f}%：接單強勁，電子股獲利有撐", "接單強勁"))
+        elif exports < 0: d.append(Driver("bad", f"外銷訂單年減 {-exports:.0f}%：接單轉弱", "接單轉弱"))
+
+    leading = _latest(df, "TW_NDC_Leading_Chg3")
+    if leading is not None:
+        if leading > 0.5: d.append(Driver("good", f"景氣領先指標 3 個月 {leading:+.2f}：台灣景氣後續偏好", "景氣領先走升"))
+        elif leading < -0.5: d.append(Driver("bad", f"景氣領先指標 3 個月 {leading:+.2f}：台灣景氣後續轉弱", "景氣領先走弱"))
+
     sahm = _latest(df, "Sahm_Indicator")
     if sahm is not None and sahm >= 0.5:
         d.append(Driver("bad", f"薩姆指標 {sahm:.2f}：衰退訊號觸發", "衰退訊號"))
+    # 外資動向是台股投資人最關心的，排在最前面 (sort 是穩定排序，其餘維持原順序)
+    d.sort(key=lambda x: not x.short.startswith("外資"))
     return d
 
 

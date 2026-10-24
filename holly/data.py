@@ -1,4 +1,4 @@
-"""數據層：只負責從外部 (FRED / yfinance / RSS) 抓原始數據，不做任何計算或填補。
+"""數據層：只負責從外部 (FRED / yfinance / 台股開放資料 / RSS) 抓原始數據，不做任何計算或填補。
 
 回傳的表會保留 NaN，讓指標層可以知道每個欄位真正的最後公布日。
 """
@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .taiwan import fetch_taiwan
 from .config import FRED_SERIES, FRED_YOY_SERIES, NEWS_RSS_URL, TW_NEWS_RSS_URLS, YEARS_BACK, YF_TICKERS, get_secret
 
 FRED_OBS_URL = "https://api.stlouisfed.org/fred/series/observations"
@@ -101,11 +102,12 @@ def fetch_market_news():
 
 
 def load_raw(years_back=YEARS_BACK):
-    """抓取全部數據，回傳 FRED + 市場數據的原始合併表 (含 NaN)。"""
-    fred = fetch_fred(get_secret("FRED_API_KEY"), years_back)
-    market = fetch_market(years_back)
-    if fred.empty:
-        return market
-    if market.empty:
-        return fred
-    return fred.join(market, how="outer").sort_index()
+    """抓取全部數據，回傳 FRED + 市場 + 台股數據的原始合併表 (含 NaN)。"""
+    parts = [fetch_fred(get_secret("FRED_API_KEY"), years_back), fetch_market(years_back), fetch_taiwan(years_back)]
+    parts = [p for p in parts if not p.empty]
+    if not parts:
+        return pd.DataFrame()
+    raw = parts[0]
+    for p in parts[1:]:
+        raw = raw.join(p, how="outer")
+    return raw.sort_index()

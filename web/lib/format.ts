@@ -14,8 +14,11 @@ export function formatValue(card: Card, value: number, opts: { compact?: boolean
 /** 變化量：價格類顯示 %；利率/百分比類只顯示數字 (單位「百分點」寫在標題) */
 export function formatChange(card: Card, value: number) {
   const unit = card.changeMode === "pct" ? "%" : "";
-  const digits = card.changeMode === "pct" ? (Math.abs(value) < 10 ? 2 : 1) : Math.max(card.decimals, 2);
-  return `${value > 0 ? "+" : ""}${value.toFixed(digits)}${unit}`;
+  const rateLike = /%|百分點/.test(card.suffix);
+  // 漲跌 %：小數 1~2 位；利率類增減：至少 2 位；億、口、分等：照卡片設定 (通常 0 位) 並加千分位
+  const digits = card.changeMode === "pct" ? (Math.abs(value) < 10 ? 2 : 1) : rateLike ? Math.max(card.decimals, 2) : card.decimals;
+  const text = value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return `${value > 0 ? "+" : ""}${text}${unit}`;
 }
 
 /** 這個方向的變化是好事還是壞事 */
@@ -26,6 +29,15 @@ export function changeTone(card: Card, value: number): "good" | "bad" | "flat" {
 }
 
 export const RANGE_DAYS = { "3M": 92, "1Y": 366, "3Y": 1100 } as const;
+
+/** 中性位階：只說在歷史上的高低，不暗示好壞 (給買賣超、成長率這類指標) */
+export function prBandNeutral(pr: number) {
+  if (pr >= 90) return "極高";
+  if (pr >= 70) return "偏高";
+  if (pr > 30) return "常態";
+  if (pr > 10) return "偏低";
+  return "極低";
+}
 
 export function prBand(pr: number) {
   if (pr >= 90) return { label: "極端", tone: "bad" as const };

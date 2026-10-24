@@ -46,3 +46,15 @@ def test_news_dedupes_same_story():
     ]
     titles = [n["title"] for n in market_moving_news(items)]
     assert len(titles) == 2 and titles[-1].startswith("聯準會")
+
+
+def test_taiwan_drivers_foreign_first_and_positives_shown():
+    import numpy as np
+    idx = pd.bdate_range("2024-01-01", periods=400)
+    flows = np.linspace(100, 0, 400); flows[-1] = -9000          # 最後一天外資 20 日賣超創新低
+    df = pd.DataFrame({"VIX": 30.0, "TW_Foreign_Net_20D": flows, "TW_Export_YoY": 71.0, "TW_NDC_Leading_Chg3": 1.7}, index=idx)
+    drivers = collect_drivers(df)
+    shorts = [x.short for x in drivers]
+    assert shorts[0] == "外資大賣" and "接單強勁" in shorts and "景氣領先走升" in shorts
+    v = market_verdict(df, _scores(60, 86))
+    assert v.drivers[0]["tone"] == "good"   # 加碼時，先列利多理由

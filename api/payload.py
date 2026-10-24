@@ -72,7 +72,7 @@ def card_payload(dataset, spec):
         "id": spec.column, "title": spec.title, "desc": spec.desc,
         "prType": spec.pr_type, "isMacro": spec.is_macro, "invertColor": spec.invert_color,
         "decimals": spec.decimals, "signed": spec.signed, "prefix": spec.prefix, "suffix": spec.suffix,
-        "changeMode": spec.change_mode, "defaultRange": spec.range,
+        "changeMode": spec.change_mode, "defaultRange": spec.range, "prNeutral": spec.pr_neutral,
         "refLines": [{"value": v, "label": label} for v, label in spec.ref_lines],
         "terms": CARD_TERMS.get(spec.column, []),
         "available": False,
@@ -100,6 +100,7 @@ def dashboard_payload(dataset, news_items=()):
     return {
         "asOf": _date(df.index[-1]),
         "missingFred": dataset.missing_fred,
+        "missingTw": dataset.missing_tw,
         "verdict": asdict(verdict),
         "vitals": [{**v, "value": _num(v["value"]), "change": _num(v["change"])} for v in vitals(dataset)],
         "regime": regime_probabilities(df),

@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from holly.config import FRED_SERIES, YF_TICKERS  # noqa: E402
+from holly.taiwan import TW_COLUMNS  # noqa: E402
 
 BASE = {
     "Total_Assets": 7e6, "ON_RRP": 3e5, "Reserve_Balances": 3.2e6, "TGA_Account": 8e5, "IORB": 4.4,
@@ -33,6 +34,12 @@ def make_raw(start="2018-01-01", end="2026-10-23"):
     trading = pd.bdate_range(start, end)
     for i, col in enumerate(YF_TICKERS):
         cols.append(pd.Series(_walk(len(trading), 100.0, 100 + i), index=trading, name=col))
+    # 台股欄位：日資料放在交易日，月資料 (景氣、外銷訂單) 只放在每月 1 日的「採用日」
+    monthly = pd.date_range(start, end, freq="MS")
+    rng = np.random.default_rng(7)
+    for col in TW_COLUMNS:
+        idx = monthly if col in ("TW_NDC_Score", "TW_NDC_Leading_Chg3", "TW_Export_YoY") else trading
+        cols.append(pd.Series(rng.normal(0, 1, len(idx)).cumsum(), index=idx, name=col))
     return pd.concat(cols, axis=1, sort=True)
 
 
