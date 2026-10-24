@@ -51,5 +51,9 @@ GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"
 
 
 def get_secret(name):
-    """讀取環境變數 (含 .env)；沒有則回傳 None。"""
-    return os.environ.get(name) or None
+    """讀取環境變數 (含 .env)；沒有則回傳 None。
+
+    會去掉前後空白與引號：在雲端後台貼金鑰時常不小心多貼了空格或 "..."。
+    """
+    value = (os.environ.get(name) or "").strip().strip("'\"").strip()
+    return value or None

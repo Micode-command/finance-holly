@@ -82,3 +82,11 @@ def test_refresh_has_cooldown(client):
     client.get("/api/dashboard")
     r = client.post("/api/refresh")
     assert r.status_code == 429 and "分鐘後" in r.json()["detail"]
+
+
+def test_secret_tolerates_pasted_whitespace_and_quotes(monkeypatch):
+    from holly.config import get_secret
+    monkeypatch.setenv("FAKE_KEY", '  "abc123"\n')
+    assert get_secret("FAKE_KEY") == "abc123"
+    monkeypatch.setenv("FAKE_KEY", "   ")
+    assert get_secret("FAKE_KEY") is None
