@@ -6,7 +6,9 @@ const signed = (v: number | null | undefined, d = 1, suffix = "%") => (v == null
 const tone = (v: number | null | undefined, invert = false) =>
   v == null || Math.abs(v) < 0.05 ? "text-ink" : v > 0 !== invert ? "text-good" : "text-bad";
 
-const STANCE = { 偏多: "border-good/50 bg-good/10 text-good", 中性: "border-warn/50 bg-warn/10 text-warn", 偏空: "border-bad/50 bg-bad/10 text-bad" } as const;
+// AI 偶爾會回「中性偏多」這類組合，依關鍵字決定顏色
+const stanceStyle = (s: string) =>
+  s.includes("偏多") ? "border-good/50 bg-good/10 text-good" : s.includes("偏空") ? "border-bad/50 bg-bad/10 text-bad" : "border-warn/50 bg-warn/10 text-warn";
 
 /** 3 個月價格情境：統計區間 (底色) + AI 悲觀 / 基本 / 樂觀 + 目前股價 */
 function PriceRange({ p, ai }: { p: NonNullable<StockCheck["metrics"]["price"]>; ai: StockCheck["ai"] }) {
@@ -94,7 +96,7 @@ export default function StockCheckResult({ r }: { r: StockCheck }) {
             {p && ` · ${p.date} 收盤 ${num(p.close, 2)}`}
           </p>
         </div>
-        {ai && <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${STANCE[ai.stance] ?? STANCE["中性"]}`}>AI 觀點：{ai.stance}</span>}
+        {ai && <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${stanceStyle(ai.stance)}`}>AI 觀點：{ai.stance}</span>}
       </div>
 
       {r.error && <p className="rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">⚠️ {r.error}</p>}

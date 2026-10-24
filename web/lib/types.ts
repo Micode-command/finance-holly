@@ -192,7 +192,7 @@ export interface StockCheck {
     flows: { foreign20d: number; trust20d: number; days: number } | null;
   };
   ai: {
-    summary: string; stance: "偏多" | "中性" | "偏空"; price_3m: { bear: number; base: number; bull: number } | null;
+    summary: string; stance: string; price_3m: { bear: number; base: number; bull: number } | null;
     reasoning: string; strengths: string[]; risks: string[]; catalysts: string[]; valuation: string; for_long_term_holder: string; outsideBand: boolean;
   } | null;
 }
