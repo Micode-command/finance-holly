@@ -1,5 +1,6 @@
 import type { Dashboard, NewsItem, Stance, Vital } from "@/lib/types";
 import MacroCommentary from "./MacroCommentary";
+import MarketPulse from "./MarketPulse";
 import RefreshButton from "./RefreshButton";
 
 export const STANCE = {
@@ -172,7 +173,11 @@ export default function Hero({ data }: { data: Dashboard }) {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-12">
+        <div className="mt-6">
+          <MarketPulse news={data.news.slice(0, 3)} />
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-12">
           {/* 左：今日結論 */}
           <div className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8 lg:col-span-7">
             <div className="scanline pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-accent/5 to-transparent" />

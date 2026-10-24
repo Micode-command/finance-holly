@@ -139,3 +139,30 @@ export interface AiResult {
   allocation_reasons?: Record<string, string>;
   market_insights_html?: string;
 }
+
+export interface MarketStatus {
+  state: "pre_open" | "open" | "closed" | "holiday" | "weekend" | "suspended";
+  label: string;
+  detail: string;
+  reason: string | null;
+  note?: string;
+  lastClosedDay: string;
+  nextOpenDay: string;
+  hoursToOpen: number;
+}
+
+export interface OpenForecast {
+  lastClose: number | null;
+  lastClosedDay: string;
+  inputs: { key: string; label: string; pct: number | null; detail: string | null }[];
+  model: "full" | "night_only" | "us_only" | null;
+  message?: string;
+  modelLabel?: string;
+  gapPct?: number;
+  gapPoints?: number | null;
+  low?: number;
+  high?: number;
+  direction?: string;
+  hitRate?: number;
+  band?: number;
+}

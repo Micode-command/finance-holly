@@ -5,6 +5,7 @@
 import threading
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 
@@ -12,6 +13,8 @@ from holly import data
 from holly.ai_advisor import generate_ai_summary
 from holly.config import get_secret
 from holly.indicators import build_dataset
+from holly.market_clock import TPE, fetch_holidays, market_status
+from holly.overnight import detect_suspension, live_inputs, opening_forecast, reconcile_last_session
 
 from .payload import dashboard_payload
 
@@ -106,6 +109,22 @@ def health():
 def dashboard():
     _, payload = cache.get()
     return {**payload, "aiEnabled": bool(get_secret("GEMINI_API_KEY"))}
+
+
+@app.get("/api/market")
+def market():
+    """台股現在開盤了沒？沒開盤時預估下次開盤。每次請求都依「現在時間」重算 (即時報價有短快取)。"""
+    now = datetime.now(TPE)
+    status = market_status(now, fetch_holidays())
+    taifex, us = live_inputs()
+    status = reconcile_last_session(detect_suspension(status, taifex, now), taifex)
+    forecast = None
+    if status["state"] != "open":
+        dataset, _ = cache.get()
+        closes = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
+        taiex = {d.date(): float(v) for d, v in closes.tail(10).items()} if closes is not None else {}
+        forecast = opening_forecast(status, taiex, taifex, us)
+    return {"status": status, "forecast": forecast}
 
 
 @app.post("/api/ai")
