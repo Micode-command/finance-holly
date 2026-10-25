@@ -13,8 +13,8 @@ from .conftest import make_raw
 def client(monkeypatch):
     monkeypatch.setattr(data, "load_raw", make_raw)
     monkeypatch.setattr(data, "fetch_market_news", lambda: [
-        {"title": "聯準會暗示降息 台積電大漲", "link": "https://example.com/1", "published": "2026-10-24T01:00:00Z", "source": "test"},
-        {"title": "某公司舉辦員工旅遊", "link": "https://example.com/2", "published": "2026-10-24T02:00:00Z", "source": "test"},
+        {"title": "聯準會暗示降息 台積電大漲", "link": "https://example.com/1", "published": None, "source": "test"},
+        {"title": "某公司舉辦員工旅遊", "link": "https://example.com/2", "published": None, "source": "test"},
     ])
     main.cache.clear()
     main.ai_cache.__init__()  # 每個測試從乾淨的 AI 快取開始

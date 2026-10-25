@@ -40,9 +40,9 @@ def test_hold_in_the_middle_and_mentions_bottom_fishing():
 def test_news_dedupes_same_story():
     from holly.news import market_moving_news
     items = [
-        {"title": "油價飆至半年新高！美股道瓊大跌652點 台積電ADR漲1%", "link": "a", "published": "2", "source": "t"},
-        {"title": "川普再提對伊朗動武推升油價！美股道瓊下殺652點、台積電ADR漲1.49%", "link": "b", "published": "1", "source": "t"},
-        {"title": "聯準會官員暗示降息，美股開高", "link": "c", "published": "0", "source": "t"},
+        {"title": "油價飆至半年新高！美股道瓊大跌652點 台積電ADR漲1%", "link": "a", "published": None, "source": "t"},
+        {"title": "川普再提對伊朗動武推升油價！美股道瓊下殺652點、台積電ADR漲1.49%", "link": "b", "published": None, "source": "t"},
+        {"title": "聯準會官員暗示降息，美股開高", "link": "c", "published": None, "source": "t"},
     ]
     titles = [n["title"] for n in market_moving_news(items)]
     assert len(titles) == 2 and titles[-1].startswith("聯準會")

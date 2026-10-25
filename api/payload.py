@@ -11,7 +11,7 @@ from holly.news import market_moving_news
 from holly.scores import market_scores
 from holly.data import MARKET_ERRORS
 from holly.taiwan import LAST_ERRORS
-from holly.signals import bottom_fishing_signals, regime_probabilities
+from holly.signals import bottom_fishing_signals, regime_probabilities, volatility_heat
 from holly.verdict import market_verdict, vitals
 
 CHART_YEARS = 3
@@ -120,6 +120,7 @@ def dashboard_payload(dataset, news_items=()):
         "verdict": asdict(verdict),
         "vitals": [{**v, "value": _num(v["value"]), "change": _num(v["change"])} for v in vitals(dataset)],
         "regime": regime_probabilities(df),
+        "volatilityHeat": volatility_heat(df),
         "news": market_moving_news(list(news_items)),
         "macro": macro_commentary(dataset),
         "scores": asdict(scores) if scores else None,

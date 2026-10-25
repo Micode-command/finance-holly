@@ -12,7 +12,7 @@ import requests
 import yfinance as yf
 
 from .taiwan import fetch_taiwan
-from .config import FRED_SERIES, FRED_YOY_SERIES, NEWS_RSS_URL, TW_NEWS_RSS_URLS, YEARS_BACK, YF_TICKERS, get_secret
+from .config import FRED_SERIES, FRED_YOY_SERIES, NEWS_RSS_URL, NEWS_FEEDS, YEARS_BACK, YF_TICKERS, get_secret
 
 FRED_OBS_URL = "https://api.stlouisfed.org/fred/series/observations"
 
@@ -96,26 +96,32 @@ def fetch_headlines(limit=5):
         return []
 
 
+def _fetch_feed(url, source, region):
+    try:
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        feed = feedparser.parse(res.content)
+    except Exception as e:
+        print(f"⚠️ 新聞來源失敗 [{source}]: {str(e)[:80]}")
+        return []
+    out = []
+    for e in feed.entries:
+        title = " ".join(e.get("title", "").split())
+        published = e.get("published_parsed") or e.get("updated_parsed")
+        if title:
+            out.append({"title": title, "link": e.get("link", ""), "source": source, "region": region,
+                        "published": time.strftime("%Y-%m-%dT%H:%M:%SZ", published) if published else None})
+    return out
+
+
 def fetch_market_news():
-    """中文財經新聞 (Yahoo 奇摩股市)：回傳 [{title, link, published, source}]，依時間新到舊。"""
+    """台灣、美國、日本財經新聞：回傳 [{title, link, published, source, region}]，依時間新到舊。"""
+    with ThreadPoolExecutor(max_workers=len(NEWS_FEEDS)) as pool:
+        batches = list(pool.map(lambda f: _fetch_feed(*f), NEWS_FEEDS))
     items, seen = [], set()
-    for url in TW_NEWS_RSS_URLS:
-        try:
-            feed = feedparser.parse(url)
-        except Exception:
-            continue
-        for e in feed.entries:
-            title = e.get("title", "").strip()
-            if not title or title in seen:
-                continue
-            seen.add(title)
-            published = e.get("published_parsed")
-            items.append({
-                "title": title,
-                "link": e.get("link", ""),
-                "published": time.strftime("%Y-%m-%dT%H:%M:%SZ", published) if published else None,
-                "source": "Yahoo奇摩股市",
-            })
+    for item in (x for batch in batches for x in batch):
+        if item["title"] not in seen:
+            seen.add(item["title"])
+            items.append(item)
     return sorted(items, key=lambda x: x["published"] or "", reverse=True)
 
 

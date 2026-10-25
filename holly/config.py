@@ -42,9 +42,14 @@ YF_TICKERS = {
 }
 
 NEWS_RSS_URL = "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"  # 英文，餵給 AI
-TW_NEWS_RSS_URLS = [  # 中文，首頁新聞時事
-    "https://tw.stock.yahoo.com/rss?category=news",
-    "https://tw.stock.yahoo.com/rss?category=intl-markets",
+# 首頁新聞時事：(網址, 來源名稱, 地區)。台灣用中文，美國與日本用當地主要財經媒體 (英文)
+NEWS_FEEDS = [
+    ("https://tw.stock.yahoo.com/rss?category=news", "Yahoo奇摩股市", "台灣"),
+    ("https://tw.stock.yahoo.com/rss?category=intl-markets", "Yahoo奇摩股市", "國際"),
+    ("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839135", "CNBC", "美國"),
+    ("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362", "CNBC", "國際"),
+    ("https://feeds.content.dowjones.io/public/rss/mw_topstories", "MarketWatch", "美國"),
+    ("https://asia.nikkei.com/rss/feed/nar", "Nikkei Asia", "日本"),
 ]
 # 依序嘗試：3.5 Flash 最強但常忙線 (503)，忙線或額度用完就改用 2.5 Flash / Flash-Lite
 GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]

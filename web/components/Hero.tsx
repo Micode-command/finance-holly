@@ -48,7 +48,7 @@ function Ticker({ vitals }: { vitals: Vital[] }) {
   );
 }
 
-function RegimeBar({ regime }: { regime: Dashboard["regime"] }) {
+function RegimeBar({ regime, heat }: { regime: Dashboard["regime"]; heat: number | null }) {
   const parts = [
     { label: "低波動", value: regime.Forecast_Prob_Low_Vol, color: "var(--accent)" },
     { label: "高波動", value: regime.Forecast_Prob_High_Vol, color: "var(--serious)" },
@@ -56,7 +56,7 @@ function RegimeBar({ regime }: { regime: Dashboard["regime"] }) {
   ];
   return (
     <div>
-      <p className="text-xs text-muted">未來一週市場體制機率</p>
+      <p className="text-xs text-muted">未來一週 (5 個交易日) 台股會是哪種行情</p>
       <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full">
         {parts.map((p) => <div key={p.label} style={{ width: `${p.value}%`, background: p.color }} />)}
       </div>
@@ -68,6 +68,11 @@ function RegimeBar({ regime }: { regime: Dashboard["regime"] }) {
           </span>
         ))}
       </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        找出過去 10 年「近一個月波動程度」最像現在的 200 個交易日，統計它們接下來一週的走勢。
+        高波動 = 平均每天漲跌幅是平常的 1.5 倍以上；黑天鵝 = 一週內最多跌超過 7%，這種事任何指標都很難事先預測，歷史上約 2% 的週會發生。
+        {heat != null && <> 目前台股近一個月的波動是平常的 <span className="font-mono text-ink-2">{heat.toFixed(2)}</span> 倍。</>}
+      </p>
     </div>
   );
 }
@@ -90,10 +95,11 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
           {news.map((n) => (
             <li key={n.link || n.title} className="py-3">
               <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                {n.region && <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">{n.region}</span>}
                 {n.topics.map((t) => (
                   <span key={t} className="rounded bg-surface-2 px-1.5 py-0.5 text-ink-2">{t}</span>
                 ))}
-                <span className="ml-auto font-mono text-muted">{newsTime(n.published)}</span>
+                <span className="ml-auto text-muted"><span className="font-mono">{newsTime(n.published)}</span> {n.source}</span>
               </div>
               <a href={n.link} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-sm leading-snug text-ink hover:text-accent">
                 {n.title}
@@ -113,7 +119,9 @@ function NewsPanel({ news }: { news: NewsItem[] }) {
           ))}
         </ul>
       )}
-      <p className="mt-auto pt-2 text-[11px] text-muted">來源：{news[0]?.source ?? "Yahoo奇摩股市"}，依關鍵字自動分類。每則新聞的影響分析在下方「AI 解析」。</p>
+      <p className="mt-auto pt-2 text-[11px] text-muted">
+        來源：Yahoo奇摩股市、CNBC、MarketWatch、Nikkei Asia (美國與日本為英文原文)，依關鍵字挑出與股市相關的新聞，台灣、國際、美國、日本各保留名額。每則新聞的影響分析在下方「AI 解析報告」。
+      </p>
     </div>
   );
 }
@@ -215,7 +223,7 @@ export default function Hero({ data }: { data: Dashboard }) {
               {v.drivers.length === 0 && <li className="text-sm text-ink-2">各項指標多在常態區間</li>}
             </ul>
             <div className="mt-6 border-t border-hairline pt-5">
-              <RegimeBar regime={data.regime} />
+              <RegimeBar regime={data.regime} heat={data.volatilityHeat} />
             </div>
             <div className="mt-6 border-t border-hairline pt-5">
               <MacroCommentary notes={data.macro} />

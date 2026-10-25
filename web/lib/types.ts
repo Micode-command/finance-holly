@@ -68,6 +68,7 @@ export interface NewsItem {
   link: string;
   published: string | null;
   source: string;
+  region?: "台灣" | "國際" | "美國" | "日本";
   topics: string[];
   related: { id: string; label: string }[];
 }
@@ -123,6 +124,7 @@ export interface Dashboard {
   verdict: Verdict;
   vitals: Vital[];
   regime: Regime;
+  volatilityHeat: number | null;
   news: NewsItem[];
   macro: MacroNote[];
   scores: MarketScores | null;
