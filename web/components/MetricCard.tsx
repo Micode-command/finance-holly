@@ -1,10 +1,10 @@
-import { changeTone, formatChange, formatValue, prBand, prBandNeutral } from "@/lib/format";
+import { formatChange, formatValue, prBand, prBandNeutral } from "@/lib/format";
 import { TERM_BY_ID } from "@/lib/glossary";
 import type { Card } from "@/lib/types";
 import TrendChart from "./TrendChart";
 
-const TONE_TEXT = { good: "text-good-text", bad: "text-bad", flat: "text-muted" } as const;
-const TONE_ICON = { good: "▲", bad: "▼", flat: "■" } as const;
+/** 漲跌只看方向：漲紅、跌綠、平盤黃 (指標本身是利多還是利空，寫在說明與位階) */
+const dirClass = (v: number) => (Math.abs(v) < 1e-9 ? "text-flat" : v > 0 ? "text-up" : "text-down");
 
 /** 變化量的單位：價格類是 %；利率、百分比類是「百分點」；其他用卡片本身的單位 (億、口、分、兆) */
 function changeUnit(card: Card) {
@@ -20,12 +20,11 @@ function ChangeChips({ card }: { card: Card }) {
       <p className="mb-1 text-[11px] text-muted">變化 ({changeUnit(card)})</p>
     <dl className="grid grid-cols-3 gap-1.5">
       {card.changes?.map((c) => {
-        const tone = c.value == null ? "flat" : changeTone(card, c.value);
-        const arrow = c.value == null ? "" : c.value > 0 ? "▲" : c.value < 0 ? "▼" : TONE_ICON.flat;
+        const arrow = c.value == null ? "" : c.value > 0 ? "▲" : c.value < 0 ? "▼" : "■";
         return (
           <div key={c.label} className="rounded-md bg-page/70 px-2 py-1">
             <dt className="text-[11px] text-muted">{c.label}</dt>
-            <dd className={`font-mono text-xs font-semibold ${TONE_TEXT[tone]}`}>
+            <dd className={`font-mono text-sm font-semibold ${c.value == null ? "text-muted" : dirClass(c.value)}`}>
               {c.value == null ? "—" : `${arrow} ${formatChange(card, c.value)}`}
             </dd>
           </div>
@@ -36,31 +35,38 @@ function ChangeChips({ card }: { card: Card }) {
   );
 }
 
-const BAND_FILL = {
-  bad: "bg-bad",
-  serious: "bg-serious",
-  neutral: "bg-muted",
-  goodSoft: "bg-good/60",
-  good: "bg-good",
+// 位階到極端時「亮燈」：標籤改成實心色塊，一眼就看得到
+const BAND_STYLE = {
+  bad: { dot: "bg-alert", chip: "bg-alert text-page" },
+  serious: { dot: "bg-serious", chip: "bg-serious/20 text-serious" },
+  neutral: { dot: "bg-ink-2", chip: "text-ink-2" },
+  goodSoft: { dot: "bg-up", chip: "bg-up/20 text-good-text" },
+  good: { dot: "bg-up", chip: "bg-up text-page" },
+  extreme: { dot: "bg-flat", chip: "bg-flat text-page" },
 } as const;
 
-/** PR 位階條：0-100 的位置 + 文字標籤 (不只靠顏色) */
+/** 近 3 年位階條：0-100 的位置 + 文字標籤 (不只靠顏色) */
+const PR_LABEL: Record<string, string> = { "C-PR": "近 3 年位階", "G-120PR": "半年漲幅的 3 年位階", "G-200PR": "200 日漲幅的 3 年位階" };
+
 function PrMeter({ label, value, neutral }: { label: string; value: number; neutral?: boolean }) {
-  const band = neutral ? { label: prBandNeutral(value), tone: "neutral" as const } : prBand(value);
+  const band = neutral
+    ? { label: prBandNeutral(value), tone: value >= 90 || value <= 10 ? ("extreme" as const) : ("neutral" as const) }
+    : prBand(value);
+  const st = BAND_STYLE[band.tone];
   return (
     <div className="min-w-0">
-      <div className="flex items-baseline justify-between text-[11px]">
-        <span className="text-muted">{label} 歷史位階</span>
-        <span className="font-semibold tabular-nums text-ink">
-          {value.toFixed(0)} · {band.label}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted">{PR_LABEL[label] ?? label}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-sm text-ink">{value.toFixed(0)}</span>
+          <span className={`rounded px-1.5 py-0.5 font-semibold ${st.chip}`}>{band.label}</span>
         </span>
       </div>
-      <div className="relative mt-1 h-1.5 rounded-full bg-neutral">
-        {/* 80 / 90 警戒刻度 */}
-        <div className="absolute inset-y-0 left-[80%] w-px bg-surface" />
+      <div className="relative mt-1.5 h-1.5 rounded-full bg-neutral">
+        <div className="absolute inset-y-0 left-[10%] w-px bg-surface" />
         <div className="absolute inset-y-0 left-[90%] w-px bg-surface" />
         <div
-          className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${neutral ? "bg-accent" : BAND_FILL[band.tone]}`}
+          className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${st.dot}`}
           style={{ left: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
@@ -73,7 +79,7 @@ function thresholdStatus(card: Card) {
   if (card.latest == null || card.refLines.length === 0) return null;
   return card.refLines
     .map((r) => `${card.latest! >= r.value ? "高於" : "低於"} ${r.label}`)
-    .join(" · ");
+    .join("；");
 }
 
 function Explanation({ card }: { card: Card }) {
@@ -88,12 +94,12 @@ function Explanation({ card }: { card: Card }) {
       {terms.map((term) => (
         <div key={term.id} className="mt-3 rounded-lg bg-page/60 p-3">
           <p className="font-semibold text-ink">{term.name}</p>
-          <p className="font-mono text-[10px] text-muted">{term.en}</p>
+          <p className="text-[11px] text-muted">{term.en}</p>
           <p className="mt-1.5 text-ink-2">{term.short}</p>
           <ul className="mt-1.5 space-y-0.5">
             {term.read.slice(0, 3).map((r) => <li key={r}>› {r}</li>)}
           </ul>
-          <a href={`#term-${term.id}`} className="mt-1.5 inline-block text-accent hover:underline">看完整解釋 →</a>
+          <a href={`#term-${term.id}`} className="mt-1.5 inline-block text-accent hover:underline">看完整解釋</a>
         </div>
       ))}
       <p className="mt-3 font-semibold text-ink">這張卡片的重點</p>
@@ -120,7 +126,7 @@ export default function MetricCard({ card }: { card: Card }) {
     return (
       <article id={`card-${card.id}`} className="glass scroll-mt-24 rounded-xl p-4">
         <h3 className="font-semibold">{card.title}</h3>
-        <p className="mt-3 text-sm text-bad">無數據：請確認 FRED_API_KEY 或稍後重新整理</p>
+        <p className="mt-3 text-sm text-alert">無數據：請確認 FRED_API_KEY 或稍後重新整理</p>
       </article>
     );
   }
@@ -137,14 +143,14 @@ export default function MetricCard({ card }: { card: Card }) {
           </span>
           <span className="text-[11px] text-muted">資料日期 {card.lastDate}</span>
         </div>
-        {(status || card.note) && <p className="mt-1 text-xs text-ink-2">{[card.note, status].filter(Boolean).join(" · ")}</p>}
+        {(status || card.note) && <p className="mt-1 text-xs text-ink-2">{[card.note, status].filter(Boolean).join("；")}</p>}
       </header>
 
       <ChangeChips card={card} />
       <TrendChart card={card} />
 
       {card.percentiles && card.percentiles.length > 0 && (
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${card.percentiles.length}, minmax(0, 1fr))` }}>
+        <div className="space-y-2.5">
           {card.percentiles.map((p) => p.value != null && <PrMeter key={p.label} label={p.label} value={p.value} neutral={card.prNeutral} />)}
         </div>
       )}

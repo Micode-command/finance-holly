@@ -37,3 +37,19 @@ def test_contrarian_direction():
     o_calm, _ = composite(calm, OPPORTUNITY, 10)
     o_panic, _ = composite(panic, OPPORTUNITY, 10)
     assert o_panic.iloc[-1] > o_calm.iloc[-1] + 20
+
+
+def test_projection_reverts_toward_mean_with_widening_band():
+    from holly.scores import project
+    rng = np.random.default_rng(0)
+    x = np.zeros(1500)
+    for i in range(1, 1500):                      # 會回歸平均 50 的序列
+        x[i] = 0.97 * x[i - 1] + rng.normal(0, 2)
+    s = pd.Series(50 + x, index=pd.bdate_range("2020-01-01", periods=1500))
+    s.iloc[-1] = 90                               # 今天特別高
+    p = project(s)
+    assert p[0] == [0, 90.0, 90.0, 90.0]
+    mids = [m for _, m, _, _ in p]
+    assert mids == sorted(mids, reverse=True) and mids[-1] < 75        # 往 50 回落
+    widths = [hi - lo for _, _, lo, hi in p[1:]]
+    assert widths[-1] > widths[0]                                       # 越遠越不確定

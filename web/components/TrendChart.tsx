@@ -22,7 +22,7 @@ import { useRange } from "./RangeContext";
 const DAY = 86_400_000;
 const RECENT_DAYS = 30; // 「最近一個月」底色
 
-type Point = { t: number; v: number };
+type Point = { t: number; v: number; ma: number | null };
 
 /** 取整齊的刻度 (1 / 2 / 2.5 / 5 × 10^n)，避免 +2.08、-1.55 這種難讀的數字 */
 function niceTicks(lo: number, hi: number, count = 4) {
@@ -52,13 +52,13 @@ export default function TrendChart({ card }: { card: Card }) {
   const range = globalRange === "auto" ? card.defaultRange : globalRange;
 
   const { points, ticks, domain, refLines, sparse } = useMemo(() => {
-    const all: Point[] = (card.series ?? []).map(([d, v]) => ({ t: Date.parse(d), v }));
+    const all: Point[] = (card.series ?? []).map(([d, v, ma]) => ({ t: Date.parse(d), v, ma: ma ?? null }));
     const end = all.at(-1)?.t ?? 0;
     // 月/季資料在短區間內點太少時，至少保留 6 個點才看得出方向
     let pts = all.filter((p) => p.t >= end - RANGE_DAYS[range] * DAY);
     if (pts.length < 6) pts = all.slice(-6);
 
-    const vals = pts.map((p) => p.v);
+    const vals = pts.flatMap((p) => (p.ma == null ? [p.v] : [p.v, p.ma]));
     let lo = Math.min(...vals);
     let hi = Math.max(...vals);
     const span = hi - lo || Math.abs(hi) * 0.1 || 1;
@@ -84,7 +84,16 @@ export default function TrendChart({ card }: { card: Card }) {
       : `${d.getMonth() + 1}/${d.getDate()}`;
   };
 
+  const ma = last.ma;
   return (
+    <div>
+    {card.maLabel && ma != null && (
+      <p className="mb-1 flex items-center gap-1.5 text-xs text-muted">
+        <span className="inline-block w-4 border-t-2 border-dashed border-flat" />
+        {card.maLabel} <span className="font-mono text-ink-2">{formatValue(card, ma, { compact: true })}</span>
+        <span className={last.v >= ma ? "text-up" : "text-down"}>{last.v >= ma ? "現值在均線之上" : "現值在均線之下"}</span>
+      </p>
+    )}
     <div className="h-36 w-full" role="img" aria-label={`${card.title} 走勢圖，最新值 ${formatValue(card, last.v)}`}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
@@ -123,10 +132,10 @@ export default function TrendChart({ card }: { card: Card }) {
             <ReferenceLine
               key={r.value}
               y={r.value}
-              stroke="var(--bad)"
+              stroke="var(--serious)"
               strokeOpacity={0.55}
               strokeDasharray="4 3"
-              label={{ value: formatValue(card, r.value, { compact: true }), position: "insideBottomLeft", fill: "var(--bad)", fontSize: 10 }}
+              label={{ value: formatValue(card, r.value, { compact: true }), position: "insideBottomLeft", fill: "var(--serious)", fontSize: 10 }}
             />
           ))}
           <Area dataKey="v" type="linear" stroke="none" fill={`url(#fill-${card.id})`} isAnimationActive={false} />
@@ -139,6 +148,11 @@ export default function TrendChart({ card }: { card: Card }) {
             activeDot={{ r: 4, fill: "var(--series)", stroke: "var(--surface)", strokeWidth: 2 }}
             isAnimationActive={false}
           />
+          {/* 均線：依指標頻率挑週期 (日資料半年線、月資料 6 個月均線…)，看現在高於還是低於「常態」 */}
+          {card.maLabel && (
+            <Line dataKey="ma" type="linear" stroke="var(--ma)" strokeWidth={1.5} strokeDasharray="5 3" dot={false} activeDot={false}
+              connectNulls isAnimationActive={false} />
+          )}
           {/* 最新一點：實心點 + 外圈 */}
           <ReferenceDot x={last.t} y={last.v} r={4.5} fill="var(--series)" stroke="var(--surface)" strokeWidth={2} />
           <Tooltip
@@ -152,12 +166,14 @@ export default function TrendChart({ card }: { card: Card }) {
                 <div className="rounded-md border border-hairline bg-surface-2 px-2.5 py-1.5 text-xs shadow-lg">
                   <div className="text-muted">{`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`}</div>
                   <div className="font-mono font-semibold text-ink">{formatValue(card, p.v)}</div>
+                  {p.ma != null && <div className="text-flat">均線 <span className="font-mono">{formatValue(card, p.ma)}</span></div>}
                 </div>
               );
             }}
           />
         </ComposedChart>
       </ResponsiveContainer>
+    </div>
     </div>
   );
 }

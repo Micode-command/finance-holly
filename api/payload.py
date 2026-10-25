@@ -30,11 +30,23 @@ def _date(ts):
     return ts.strftime("%Y-%m-%d") if ts is not None else None
 
 
+# 依指標公布頻率選「約半年」的均線：日資料 120 日、週資料 26 週、月資料 6 個月、季資料 4 季
+MA_BY_FREQUENCY = [(4, 120, "120 日均線 (半年線)"), (12, 26, "26 週均線 (半年)"), (45, 6, "6 個月均線"), (10_000, 4, "4 季均線 (一年)")]
+PR_YEARS = 3       # 歷史位階只看近 3 年：資金規模與估值水準一直在變，10 年前的數字參考性低
+
+
+def _ma_spec(points):
+    gap = float(pd.Series(points.index).diff().dt.days.median()) if len(points) > 2 else 1
+    return next((w, label) for limit, w, label in MA_BY_FREQUENCY if gap <= limit)
+
+
 def _chart_points(dataset, column):
-    """只畫真正公布數據的那些天：週/月資料不再被 ffill 畫成階梯。"""
+    """只畫真正公布數據的那些天 (週/月資料不畫成階梯)，並附上適合頻率的均線。"""
     s = dataset.release_points(column)
-    s = s[s.index >= s.index[-1] - pd.DateOffset(years=CHART_YEARS)]
-    return [[_date(d), _num(v)] for d, v in s.items()]
+    window, label = _ma_spec(s)
+    ma = s.rolling(window, min_periods=window).mean()
+    keep = s.index >= s.index[-1] - pd.DateOffset(years=CHART_YEARS)
+    return [[_date(d), _num(v), _num(m)] for d, v, m in zip(s.index[keep], s[keep], ma[keep])], label
 
 
 def _change(latest, previous, mode):
@@ -63,6 +75,7 @@ def _changes(dataset, series, spec):
 def _percentiles(series, spec):
     if len(series) < 252:
         return []
+    series = series[series.index >= series.index[-1] - pd.DateOffset(years=PR_YEARS)]
     if spec.pr_type == "C":
         pr = cycle_pr(series, invert=spec.invert_pr)
         return [{"label": "C-PR", "value": _num(pr, 1)}] if pr is not None else []
@@ -89,8 +102,8 @@ def card_payload(dataset, spec):
         "changes": _changes(dataset, series, spec),
         "percentiles": _percentiles(series, spec),
         "note": spec.note(dataset) if spec.note else None,
-        "series": _chart_points(dataset, spec.column),
     })
+    card["series"], card["maLabel"] = _chart_points(dataset, spec.column)
     return card
 
 

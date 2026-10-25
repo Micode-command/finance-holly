@@ -12,7 +12,7 @@ function FactorRow({ f, tone }: { f: ScoreFactor; tone: "opp" | "risk" }) {
       <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="text-ink">{f.label}</span>
         <span className="font-mono text-xs text-ink-2">
-          {f.value} · <span className="text-ink">{f.score}</span>
+          {f.value}，<span className="text-ink">{f.score}</span>
         </span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-neutral">

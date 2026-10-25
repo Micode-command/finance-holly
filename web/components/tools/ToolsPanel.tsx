@@ -54,7 +54,7 @@ function StockCheckTool({ access, autoQuery }: { access: Access; autoQuery?: str
         <button type="submit" disabled={loading} className={buttonCls}>{loading ? "分析中…" : "🔍 開始健檢"}</button>
       </form>
       {loading && <p className="text-sm text-ink-2">⏳ 正在抓取股價、月營收、財報並請 AI 分析，大約 20～40 秒…</p>}
-      {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad">{error}</p>}
+      {error && <p className="rounded-lg bg-alert/10 px-3 py-2 text-sm text-alert">{error}</p>}
       {candidates.length > 0 && (
         <div>
           <p className="text-sm text-ink-2">找到多家符合的公司，請選一家：</p>

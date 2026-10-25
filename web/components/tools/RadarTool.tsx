@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { RadarResult, RadarStock } from "@/lib/types";
 import { type Access, buttonCls, postTool } from "./shared";
+import { PlanLadder } from "./Technicals";
 
 const num = (v: number | null | undefined, d = 0, s = "") =>
   v == null ? "—" : `${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}${s}`;
@@ -29,13 +30,13 @@ function Funnel({ f }: { f: RadarResult["funnel"] }) {
 }
 
 function StockCard({ s, onCheck }: { s: RadarStock; onCheck: (code: string) => void }) {
-  const gapTone = s.fairGap == null ? "text-ink" : s.fairGap > 0 ? "text-good" : "text-warn";
+  const gapTone = s.fairGap == null ? "text-ink" : s.fairGap > 0 ? "text-up" : "text-flat";
   return (
     <article className="glass glass-hover flex flex-col gap-2 rounded-xl p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h4 className="font-semibold">{s.name.replace("*", "")} <span className="font-mono text-sm text-muted">{s.code}</span></h4>
-          <p className="text-[11px] text-muted">{s.industry}{s.business && ` · ${s.business}`}</p>
+          <p className="text-[11px] text-muted">{s.industry}{s.business && `，${s.business}`}</p>
         </div>
         {s.theme ? (
           <span className="shrink-0 rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[11px] text-accent">{s.theme}</span>
@@ -60,13 +61,34 @@ function StockCard({ s, onCheck }: { s: RadarStock; onCheck: (code: string) => v
           <dd className="font-mono text-[11px] text-muted">殖利率 {num(s.dividendYield, 1, "%")}</dd>
         </div>
       </dl>
-      {s.why && s.theme && <p className="text-xs text-ink-2">💡 {s.why}</p>}
+      {s.why && s.theme && <p className="text-xs text-ink-2">{s.why}</p>}
       {s.inorganic && (
         <p className="rounded bg-warn/10 px-2 py-1 text-[11px] text-warn">⚠️ 營收成長含併購 / 新納入子公司，不完全是原本業務的需求成長</p>
       )}
-      {s.note && <p className="text-[11px] text-muted">📄 公司營收說明：{s.note.slice(0, 80)}</p>}
+      {s.note && <p className="text-[11px] text-muted">公司營收說明：{s.note.slice(0, 80)}</p>}
+      {s.technicals && (
+        <details className="group rounded-lg bg-page/50 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm">
+            <span>
+              交易計畫：進場 <span className="font-mono">{num(s.technicals.plan.entryLow, 1)}～{num(s.technicals.plan.entryHigh, 1)}</span>
+            </span>
+            <span className="text-xs text-muted">
+              風險報酬比 <span className="font-mono text-sm text-ink">{s.technicals.plan.rr?.toFixed(1) ?? "—"}</span>
+              <span className="ml-1 group-open:hidden">▾</span><span className="ml-1 hidden group-open:inline">▴</span>
+            </span>
+          </summary>
+          <div className="mt-2 space-y-2">
+            <PlanLadder plan={s.technicals.plan} close={s.close} compact />
+            {s.case && <p className="text-xs leading-relaxed"><b>為何成立：</b>{s.case}</p>}
+            {s.invalidation && <p className="text-xs leading-relaxed text-ink-2"><b className="text-ink">失效條件：</b>{s.invalidation}</p>}
+            <ul className="space-y-0.5 text-xs text-muted">
+              {s.technicals.readings.slice(0, 3).map((r) => <li key={r}>› {r}</li>)}
+            </ul>
+          </div>
+        </details>
+      )}
       <button onClick={() => onCheck(s.code)} className="mt-auto self-start rounded-lg border border-hairline px-3 py-1.5 text-sm text-ink-2 hover:border-accent hover:text-accent">
-        🔍 深入健檢
+        深入健檢
       </button>
     </article>
   );
@@ -95,17 +117,17 @@ export default function RadarTool({ access, onCheck }: { access: Access; onCheck
         三層篩選：<b className="text-ink-2">新聞</b>找出需求升溫的技術趨勢 → <b className="text-ink-2">營收</b>證明需求真的來了 (創新高且加速) →
         <b className="text-ink-2"> EPS 合理價</b>排除太貴或便宜到可疑的股票。是「值得研究的候選名單」，不是買進推薦。
       </p>
-      <button onClick={run} disabled={loading} className={buttonCls}>{loading ? "掃描中…" : "📡 產生潛力股名單"}</button>
-      {loading && <p className="text-sm text-ink-2">⏳ 正在掃描全市場的營收與估值，並請 AI 讀新聞歸納趨勢，大約 30～60 秒…</p>}
-      {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad">{error}</p>}
+      <button onClick={run} disabled={loading} className={buttonCls}>{loading ? "掃描中…" : "產生潛力股名單"}</button>
+      {loading && <p className="text-sm text-ink-2">正在掃描全市場的營收與估值、計算前 12 檔的技術面，並請 AI 讀新聞歸納趨勢，大約 1 分鐘…</p>}
+      {error && <p className="rounded-lg bg-alert/10 px-3 py-2 text-sm text-alert">{error}</p>}
 
       {result && !loading && (
         <div className="space-y-5">
           <p className="text-[11px] text-muted">
-            營收資料 {result.revenueMonth} · 價格 {result.priceDate && `${Number(result.priceDate.slice(0, 3)) + 1911}/${result.priceDate.slice(3, 5)}/${result.priceDate.slice(5)}`}
-            · 名單每 6 小時更新一次{result.cached && "，這是與其他訪客共用的名單"}{result.model && ` · AI：${result.model}`}
+            營收資料 {result.revenueMonth}，價格 {result.priceDate && `${Number(result.priceDate.slice(0, 3)) + 1911}/${result.priceDate.slice(3, 5)}/${result.priceDate.slice(5)}`}
+           ，名單每 6 小時更新一次{result.cached && "，這是與其他訪客共用的名單"}{result.model && `，AI：${result.model}`}
           </p>
-          {result.error && <p className="rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">⚠️ {result.error}</p>}
+          {result.error && <p className="rounded-lg bg-alert/10 px-3 py-2 text-sm text-alert">⚠️ {result.error}</p>}
           <Funnel f={result.funnel} />
 
           {b && (

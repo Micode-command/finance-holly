@@ -41,7 +41,7 @@ export default function MacroCommentary({ notes }: { notes: MacroNote[] }) {
     <div>
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted">
-          總經觀點 <span className="font-mono tracking-widest">· MACRO VIEW</span>
+          總經觀點
         </p>
         <button onClick={shuffle} className="rounded-md px-2 py-0.5 text-xs text-ink-2 hover:bg-neutral hover:text-accent">
           🔀 換一組 ({notes.length} 則)
@@ -61,7 +61,7 @@ export default function MacroCommentary({ notes }: { notes: MacroNote[] }) {
                     </span>
                     <span className="font-mono text-[11px] text-muted">
                       {n.metric.label} {n.metric.value}
-                      {n.metric.change && ` · ${n.metric.change}`}
+                      {n.metric.change && `，${n.metric.change}`}
                     </span>
                   </div>
                   <p className="mt-1 text-sm leading-relaxed text-ink">{n.zh}</p>
@@ -70,7 +70,7 @@ export default function MacroCommentary({ notes }: { notes: MacroNote[] }) {
               );
             })}
       </ul>
-      <p className="mt-2 text-[10px] text-muted">依 FRED 最新數據自動產生 · 每次開啟隨機顯示</p>
+      <p className="mt-2 text-[10px] text-muted">依 FRED 最新數據自動產生，每次開啟隨機顯示</p>
     </div>
   );
 }

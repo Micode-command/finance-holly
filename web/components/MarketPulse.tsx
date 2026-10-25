@@ -15,7 +15,7 @@ const STATE_STYLE: Record<MarketStatus["state"], { dot: string; icon: string; pu
   closed: { dot: "bg-accent", icon: "🌙" },
   holiday: { dot: "bg-accent-2", icon: "🏖️" },
   weekend: { dot: "bg-accent-2", icon: "🏖️" },
-  suspended: { dot: "bg-bad", icon: "⚠️" },
+  suspended: { dot: "bg-alert", icon: "⚠️" },
 };
 
 const pct = (v: number | null | undefined, digits = 2) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`);
@@ -33,8 +33,8 @@ function Forecast({ f, status, news }: { f: OpenForecast; status: MarketStatus; 
   return (
     <div className="grid gap-5 lg:grid-cols-[1.1fr_1.3fr_1fr]">
       <div>
-        <p className="text-xs text-muted">預估下次開盤 · {fmtDay(status.nextOpenDay)} 09:00</p>
-        <p className={`glow-text mt-3 font-mono text-4xl font-bold leading-none ${tone(f.gapPct)}`}>
+        <p className="text-xs text-muted">預估下次開盤，{fmtDay(status.nextOpenDay)} 09:00</p>
+        <p className={`mt-3 font-mono text-4xl font-bold leading-none ${tone(f.gapPct)}`}>
           {up ? "▲" : "▼"} {pct(f.gapPct)}
         </p>
         <p className="mt-1 text-sm">
@@ -43,7 +43,7 @@ function Forecast({ f, status, news }: { f: OpenForecast; status: MarketStatus; 
         </p>
         <p className="mt-2 text-xs text-ink-2">
           可能區間 <span className="font-mono text-ink">{pct(f.low)} ～ {pct(f.high)}</span>
-          {f.lastClose && <> · 基準 {fmtDay(f.lastClosedDay)} 收盤 <span className="font-mono">{f.lastClose.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></>}
+          {f.lastClose && <>，基準 {fmtDay(f.lastClosedDay)} 收盤 <span className="font-mono">{f.lastClose.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></>}
         </p>
         {status.note && <p className="mt-1 text-xs text-warn">⚠️ {status.note}</p>}
       </div>
@@ -136,7 +136,7 @@ export default function MarketPulse({ news }: { news: NewsItem[] }) {
         <span className="text-sm text-ink-2">{status.detail}</span>
         {updatedAt && (
           <span className="ml-auto font-mono text-[11px] text-muted">
-            更新 {updatedAt} ·{" "}
+            更新 {updatedAt}，
             {paused ? (
               <button onClick={() => { setPaused(false); setRound((r) => r + 1); }} className="text-accent underline">
                 自動更新已暫停，點此更新

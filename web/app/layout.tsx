@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow_Semi_Condensed, Noto_Sans_TC } from "next/font/google";
 
 import { ScrollVar } from "@/components/Parallax";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const digits = Barlow_Semi_Condensed({ variable: "--font-digits", subsets: ["latin"], weight: ["500", "600", "700"] });
+const cjk = Noto_Sans_TC({ variable: "--font-cjk", subsets: ["latin"], weight: ["400", "500", "700", "900"], preload: false });
 
 export const metadata: Metadata = {
   title: "荷莉總經觀測站",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="zh-Hant" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="zh-Hant" className={`${digits.variable} ${cjk.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         <ScrollVar />
         {children}

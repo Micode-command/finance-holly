@@ -17,6 +17,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from . import technicals
+
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PE_SNAPSHOT = DATA_DIR / "radar_pe.csv.gz"         # 每月底本益比 (近 3 年)
 REV_SNAPSHOT = DATA_DIR / "radar_rev.csv.gz"       # 每月營收 (近 15 個月)
@@ -147,32 +149,55 @@ B. 判斷每一檔「候選股」(已通過營收與估值篩選) 和哪個趨�
    - none：沒有關係
    寧可判 none 也不要硬湊。可參考公司自己寫的營收變動原因 (備註)，那是最直接的需求證據。
    business 用一句話描述公司主要業務；若不確定，請寫「不確定」，不要猜。
+C. 有「技術面 / 交易計畫」數據的候選股，用 case 說明這個交易機會為何成立 (結合營收、估值與技術面，2 句內)，
+   invalidation 寫判斷失效的條件 (例如跌破停損價、營收年增轉負)。價位由程式計算，不要改數字；風險報酬比低於 1 要明講不划算。
 只輸出 JSON，字串內不要換行：
 {
   "themes": [{"name": "<趨勢名稱>", "sources": [<支持這個趨勢的新聞編號，至少 2 個>], "demand": "<需求升溫的證據，引用新聞>", "watch": "<要留意的風險>"}],
-  "stocks": {"<股票代號>": {"theme": "<趨勢名稱或 null>", "relation": "<direct|indirect|none>", "business": "<主要業務>", "why": "<判斷理由，30 字內>"}}
+  "stocks": {"<股票代號>": {"theme": "<趨勢名稱或 null>", "relation": "<direct|indirect|none>", "business": "<主要業務>", "why": "<判斷理由，30 字內>", "case": "<交易機會成立的原因或 null>", "invalidation": "<失效條件或 null>"}}
 }
 """
 
 
-def build_prompt(headlines, candidates):
+def _tech_brief(t):
+    if not t:
+        return ""
+    pl, mo = t["plan"], t["momentum"]
+    above = "、".join(m["name"] for m in t["mas"] if m["above"]) or "無"
+    trend = f"，趨勢{t['trend']['kind']}" if t.get("trend") else ""
+    return (f"；技術面：站上{above}，RSI {mo['rsi']:.0f}{trend}；計畫：進場 {pl['entryLow']:,.1f}~{pl['entryHigh']:,.1f}、"
+            f"目標 {pl['target']:,.1f}、停損 {pl['stop']:,.1f}、風險報酬比 {pl['rr']:.1f}" if pl.get("rr") else "")
+
+
+def build_prompt(headlines, candidates, techs=None):
+    techs = techs or {}
     lines = [PROMPT, "【近期新聞標題】"] + [f"{i}. {h}" for i, h in enumerate(headlines[:60], 1)]
     lines.append("\n【候選股】")
     for code, r in candidates.iterrows():
         note = f"；公司說明：{r['note'][:60]}" if r.get("note") else ""
-        lines.append(f"- {code} {r['name']} ({r.get('industry') or '產業不明'})：近 3 月營收年增 {r['yoy3']:.0f}%{note}")
+        lines.append(f"- {code} {r['name']} ({r.get('industry') or '產業不明'})：近 3 月營收年增 {r['yoy3']:.0f}%、"
+                     f"距合理價 {r['fairGap']:+.0f}%{note}{_tech_brief(techs.get(code))}")
     return "\n".join(lines)
 
 
-def build_radar(cur, pe_hist, rev_hist, latest_month, latest_rev, headlines, api_key, ask):
+TECH_TOP = 12                   # 前 12 檔另外抓日 K 算技術面 (每 6 小時最多 12 次 FinMind)
+
+
+def build_radar(cur, pe_hist, rev_hist, latest_month, latest_rev, headlines, api_key, ask, price_fetch=None):
     passed, funnel, month = screen(cur, pe_hist, rev_hist, latest_month, latest_rev)
+    techs = {}
+    for code in passed.index[:TECH_TOP] if price_fetch else []:
+        try:
+            techs[code] = technicals.analyze(price_fetch(code))
+        except Exception as e:
+            print(f"⚠️ 雷達技術面失敗 [{code}]: {e}")
     result = {"generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "funnel": funnel,
               "revenueMonth": f"{month.year}/{month.month}", "priceDate": str(cur["date"].iloc[0]) if "date" in cur else None,
               "backtest": BACKTEST, "themes": [], "model": None}
     ai = {}
     if api_key and len(passed):
         try:
-            ai, result["model"] = ask(build_prompt(headlines, passed.head(25)), api_key)
+            ai, result["model"] = ask(build_prompt(headlines, passed.head(25), techs), api_key)
         except Exception as e:
             result["error"] = f"AI 趨勢分析暫時失敗，以下只顯示數據篩選結果。({str(e)[:120]})"
     result["themes"] = valid_themes(ai.get("themes"), len(headlines[:60]))
@@ -193,11 +218,17 @@ def build_radar(cur, pe_hist, rev_hist, latest_month, latest_rev, headlines, api
             "theme": t.get("theme") if t.get("relation") == "direct" else None,
             "indirectTheme": t.get("theme") if t.get("relation") == "indirect" else None,
             "business": t.get("business"), "why": t.get("why"),
+            "technicals": _slim(techs.get(code)), "case": t.get("case"), "invalidation": t.get("invalidation"),
         })
     # 直接對上新聞趨勢的排前面，其餘照分數
     stocks.sort(key=lambda s: s["theme"] is None)
     result["stocks"] = stocks
     return result
+
+
+def _slim(t):
+    """雷達列表只需要計畫、均線與解讀，不傳整段圖表資料"""
+    return None if not t else {k: t[k] for k in ("plan", "mas", "supports", "resistances", "trend", "momentum", "readings")}
 
 
 # ---------- 資料來源 (網路 + 專案內快照) ----------
@@ -216,12 +247,20 @@ def fetch_current():
 _cache = {"at": 0.0, "result": None}
 
 
+def fetch_price(code, days=500):
+    from .taiwan import _finmind
+    start = (datetime.now() - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+    out = _finmind("TaiwanStockPrice", start, data_id=code)
+    _time.sleep(0.3)
+    return out
+
+
 def radar(headlines, api_key, ask, force=False):
     if not force and _cache["result"] and _time.time() - _cache["at"] < RESULT_TTL:
         return {**_cache["result"], "cached": True}
     cur, month, latest = fetch_current()
     pe_hist, rev_hist = load_snapshots()
-    result = build_radar(cur, pe_hist, rev_hist, month, latest, headlines, api_key, ask)
+    result = build_radar(cur, pe_hist, rev_hist, month, latest, headlines, api_key, ask, price_fetch=fetch_price)
     if not result.get("error"):
         _cache.update(at=_time.time(), result=result)
     return {**result, "cached": False}

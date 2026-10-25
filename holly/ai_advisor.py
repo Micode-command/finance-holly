@@ -12,18 +12,27 @@ from .signals import pr_matrix
 PROB_KEYS = ("Forecast_Prob_Low_Vol", "Forecast_Prob_High_Vol", "Forecast_Prob_Black_Swan")
 
 PROMPT_TEMPLATE = """
-你是一位擁有 30 年經驗的總經量化投資大師。請為穩健型高階半導體產業客戶規劃資產配置。
-【🚨 輸出要求】
-1. 只輸出下面格式的 JSON，Value 內【絕對禁止】真實換行符號。
+你是一位擁有 30 年經驗的總經與台股研究員，讀者是「長期持有、會調整比重」的一般投資人，請用白話繁體中文。
+【輸出要求】
+1. 只輸出下面格式的 JSON，字串內不要換行，不要輸出 HTML。
 2. 解讀必須與下方【量化系統今日結論】的方向一致；若你判斷不同，要明確說明理由，不可自相矛盾。
 3. 每個數字的方向請依括號內的說明解讀，不要自行反過來 (例如台幣動能為正 = 台幣貶值 = 外資流出)。
-4. allocation_recommendation 五個整數加總必須等於 100，依今日局勢自行決定，防守時現金與債券比重應提高。
+4. allocation 五個整數加總必須等於 100，依今日局勢自行決定，防守時現金與債券比重應提高。
+5. news_impacts 挑 2~4 則「最可能影響台股」的新聞 (用新聞編號標示 sources)，不要編造新聞裡沒有的事實：
+   - short_term 為 1~4 週內可能的影響；long_term 為 3~12 個月的影響
+   - affected 列出受影響的資產 (個別產業、指數、匯率或債券)，direction 用 up / down / mixed，range 寫預期波動幅度 (例如「±3~5%」)
+   - priced_in 用「已反映 / 部分反映 / 尚未反映」開頭，並說明判斷依據 (例如股價已先漲、或市場還沒討論)
+   - allocation 是可以考慮的配置調整方向；invalidation 是讓這個判斷失效的具體條件
 {
-    "macro_phase_insight": "【當前經濟階段與今日驅動】(請綜合評估通膨、聯準會淨流動性動能、台幣匯率與今日新聞給出大方向。若流動性急縮，務必提出警告)",
-    "broadcast": "<h4 style='color:#0044CC; margin-bottom: 5px;'>🏦 總經定調</h4><ul style='line-height: 1.8; margin-top: 0;'><li><b>聯準會水龍頭與籌碼：</b>(解讀聯準會淨流動性4週動能，判斷是偷偷放水還是抽銀根，並結合VIX與台幣給出短線警示)</li></ul>",
-    "allocation_recommendation": {"twd_cash": <整數>, "usd_assets": <整數>, "cashflow": <整數>, "core_growth": <整數>, "tactical_hedge": <整數>},
-    "allocation_reasons": {"twd_cash": "<一句理由>", "usd_assets": "<一句理由，例如美債/公司債>", "cashflow": "<一句理由，例如 00937B 月配息>", "core_growth": "<一句理由，例如核心持股>", "tactical_hedge": "<一句理由，例如黃金或 AI 強勢股短打>"},
-    "market_insights_html": "<div><h4 style='color: #0284C7;'>🔄 未來一週操作劇本</h4><p>(分析高頻指標與流動性抽水/放水的應對)</p><h4 style='color: #F59E0B;'>🔥 科技股熱點</h4><p>(帶入 AI、矽光子CPO、CoWoS，但若流動性吃緊則強烈建議防禦)</p></div>"
+  "phase": "<當前經濟階段與今日主要驅動，2~3 句；流動性急縮時務必警告>",
+  "liquidity": "<聯準會淨流動性、VIX 與台幣的短線解讀，2 句>",
+  "news_impacts": [{"event": "<事件，20 字內>", "sources": [<新聞編號>], "short_term": "<短期影響>", "long_term": "<長期影響>",
+                    "affected": [{"asset": "<資產>", "direction": "<up|down|mixed>", "range": "<預期波動幅度>"}],
+                    "priced_in": "<已反映 / 部分反映 / 尚未反映：理由>", "allocation": "<配置方向>", "invalidation": "<失效條件>"}],
+  "playbook": "<未來一到兩週的操作劇本，2~3 句>",
+  "tech_hotspots": "<科技股熱點 (AI、CPO、CoWoS 等) 的機會與風險，流動性吃緊時以防禦為主，2 句>",
+  "allocation": {"twd_cash": <整數>, "usd_assets": <整數>, "cashflow": <整數>, "core_growth": <整數>, "tactical_hedge": <整數>},
+  "allocation_reasons": {"twd_cash": "<一句理由>", "usd_assets": "<一句理由>", "cashflow": "<一句理由>", "core_growth": "<一句理由>", "tactical_hedge": "<一句理由>"}
 }
 """
 
@@ -58,34 +67,52 @@ def build_data_summary(df, pr, headlines, context=None):
         if notes:
             lines += ["", "【FRED 總經觀察】"] + [f"- {n['topic']}：{n['zh']}" for n in notes]
     if headlines:
-        lines += ["", "[今日華爾街/全球財經頭條]"] + [f"{i}. {t}" for i, t in enumerate(headlines, 1)]
+        lines += ["", "[今日新聞 (台股與全球財經)]"] + [f"{i}. {t}" for i, t in enumerate(headlines, 1)]
     else:
         lines += ["", "[今日國際新聞] 暫時無法取得，請純依據量化數據解盤。"]
     return "\n".join(lines)
 
 
-def generate_ai_summary(df, api_key, context=None):
+def valid_impacts(items, n_headlines):
+    """只保留有對應到真實新聞編號的影響分析 (避免 AI 憑空編事件)"""
+    out = []
+    for it in items or []:
+        if not isinstance(it, dict) or not it.get("event"):
+            continue
+        try:
+            sources = sorted({int(x) for x in it.get("sources") or [] if 1 <= int(x) <= n_headlines})
+        except (TypeError, ValueError):
+            continue
+        if sources:
+            affected = [a for a in it.get("affected") or [] if isinstance(a, dict) and a.get("asset")]
+            out.append({**it, "sources": sources, "affected": affected})
+    return out[:4]
+
+
+def generate_ai_summary(df, api_key, context=None, news=()):
+    """news：頁面上的重點新聞 [{title, link, ...}]，和英文頭條一起編號給 AI。"""
     """回傳 AI 解盤 dict。失敗時仍保留 Python 算出的機率，並附上 error 欄位。"""
     pr = pr_matrix(df)
     result = {
         "Forecast_Prob_Low_Vol": pr.get("Forecast_Prob_Low_Vol", 60.0),
         "Forecast_Prob_High_Vol": pr.get("Forecast_Prob_High_Vol", 30.0),
         "Forecast_Prob_Black_Swan": pr.get("Forecast_Prob_Black_Swan", 10.0),
-        "macro_phase_insight": "尚未取得 AI 總經觀測，請點擊重新解讀或檢查 API。",
-        "broadcast": "💡 系統提示：AI 模組連線超時或 API 錯誤。但高頻戰術機率與指標已透過 Python 量化矩陣計算完成，請參考下方數值。",
     }
     if not api_key:
         result["error"] = "請在 .env 設定 GEMINI_API_KEY"
         return result
 
-    contents = PROMPT_TEMPLATE + "\n\n" + build_data_summary(df, pr, fetch_headlines(), context)
+    sources = [{"title": n["title"], "link": n.get("link")} for n in news][:10]
+    sources += [{"title": t, "link": None} for t in fetch_headlines()]
+    contents = PROMPT_TEMPLATE + "\n\n" + build_data_summary(df, pr, [x["title"] for x in sources], context)
     try:
         ai_json, model = ask_gemini_json(contents, api_key)
     except RuntimeError as e:
         result["error"] = str(e)
         return result
+    ai_json["news_impacts"] = valid_impacts(ai_json.get("news_impacts"), len(sources))
     # AI 的文字覆蓋預設提示，但機率永遠以 Python 量化矩陣為準
-    return {**result, **ai_json, **{k: result[k] for k in PROB_KEYS}, "model": model}
+    return {**result, **ai_json, **{k: result[k] for k in PROB_KEYS}, "sources": sources, "model": model}
 
 
 def ask_gemini_json(prompt, api_key, temperature=0.1):

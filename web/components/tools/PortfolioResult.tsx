@@ -4,7 +4,7 @@ const num = (v: number | null | undefined, d = 1, s = "") =>
   v == null ? "—" : `${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}${s}`;
 const signed = (v: number | null | undefined, d = 0, s = "%") => (v == null ? "—" : `${v > 0 ? "+" : ""}${num(v, d, s)}`);
 const tone = (v: number | null | undefined) => (v == null || Math.abs(v) < 0.05 ? "text-ink" : v > 0 ? "text-good" : "text-bad");
-const RISK = { 低: "border-good/50 bg-good/10 text-good", 中: "border-warn/50 bg-warn/10 text-warn", 高: "border-bad/50 bg-bad/10 text-bad" } as Record<string, string>;
+const RISK = { 低: "border-accent/50 bg-accent/10 text-accent", 中: "border-warn/50 bg-warn/10 text-warn", 高: "border-alert/50 bg-alert/10 text-alert" } as Record<string, string>;
 const ACTION = (a: string) => (/加碼|新增/.test(a) ? "bg-good/15 text-good" : /減碼|出清/.test(a) ? "bg-bad/15 text-bad" : "bg-neutral text-ink-2");
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -60,7 +60,7 @@ export default function PortfolioResult({ r }: { r: PortfolioCheck }) {
         <h3 className="text-xl font-bold">💼 配置健檢結果</h3>
         {ai?.risk_level && <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${RISK[ai.risk_level] ?? RISK["中"]}`}>整體風險：{ai.risk_level}</span>}
       </div>
-      {r.error && <p className="rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">⚠️ {r.error}</p>}
+      {r.error && <p className="rounded-lg bg-alert/10 px-3 py-2 text-sm text-alert">⚠️ {r.error}</p>}
       {ai?.summary && <p className="rounded-lg border-l-4 border-accent bg-page/60 px-4 py-3 text-base">{ai.summary}</p>}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -142,7 +142,7 @@ export default function PortfolioResult({ r }: { r: PortfolioCheck }) {
 
       <p className="border-t border-hairline pt-3 text-[11px] leading-relaxed text-muted">
         你輸入的持股只用於這次分析，不會被儲存或分享。大盤：本站今日「{r.market?.label}」(機會 {r.market?.opportunity} / 風險 {r.market?.risk})
-        {r.model && ` · AI：${r.model}`}
+        {r.model && `，AI：${r.model}`}
         <br />
         這是依公開數據產生的一般性建議，不是個人化投資顧問服務；實際調整前請考量自己的資金需求、稅負與交易成本。
       </p>

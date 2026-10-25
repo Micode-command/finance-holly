@@ -67,7 +67,7 @@ def test_header_and_footer_payload(client):
 def test_ai_result_shared_between_visitors(client, monkeypatch):
     calls = []
 
-    def fake_ai(df, key, context):
+    def fake_ai(df, key, context, news=()):
         calls.append(1)
         return {"broadcast": "ok", "model": "fake"}
 

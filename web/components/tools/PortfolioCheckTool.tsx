@@ -56,7 +56,7 @@ export default function PortfolioCheckTool({ access }: { access: Access }) {
             <input value={r.weight} onChange={(e) => update(i, "weight", e.target.value)} placeholder="比重或金額" inputMode="decimal"
               aria-label={`第 ${i + 1} 筆比重`} className={inputCls} />
             <button type="button" onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs))}
-              aria-label={`刪除第 ${i + 1} 筆`} className="px-2 text-muted hover:text-bad">✕</button>
+              aria-label={`刪除第 ${i + 1} 筆`} className="px-2 text-muted hover:text-alert">✕</button>
           </div>
         ))}
         <div className="flex flex-wrap items-center gap-2">
@@ -77,7 +77,7 @@ export default function PortfolioCheckTool({ access }: { access: Access }) {
         </div>
       </form>
       {loading && <p className="text-sm text-ink-2">⏳ 正在抓取每檔持股的股價、配息並請 AI 分析，大約 20～60 秒…</p>}
-      {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad">{error}</p>}
+      {error && <p className="rounded-lg bg-alert/10 px-3 py-2 text-sm text-alert">{error}</p>}
       {result && !loading && <PortfolioResult r={result} />}
     </div>
   );

@@ -43,7 +43,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
   const detail = error instanceof Error ? error.message : String(error);
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">
-      <p className="font-mono text-xs tracking-[0.3em] text-accent">HOLLY · MACRO TERMINAL</p>
+      <p className="text-sm text-muted">荷莉總經觀測站</p>
       <h1 className="mt-2 text-2xl font-bold">⏳ 主機正在喚醒中</h1>
       <p className="mt-3 leading-relaxed text-ink-2">
         網站使用免費主機，一段時間沒人使用會進入休眠；喚醒並抓取最新的聯準會與市場數據大約需要 1～2 分鐘。
@@ -53,7 +53,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
           將在 <span className="font-mono text-accent">{left}</span> 秒後自動重新載入 (第 {retries + 1} / {MAX_AUTO_RETRIES} 次)…
         </p>
       ) : (
-        <p className="mt-4 text-warn">已經自動重試多次仍無法載入，可能是資料來源暫時異常，請稍後再試。</p>
+        <p className="mt-4 text-alert">已經自動重試多次仍無法載入，可能是資料來源暫時異常，請稍後再試。</p>
       )}
       <button
         onClick={() => {

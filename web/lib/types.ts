@@ -28,7 +28,8 @@ export interface Card {
   changes?: { label: string; value: number | null }[];
   percentiles?: { label: string; value: number | null }[];
   note?: string | null;
-  series?: [string, number][];
+  series?: [string, number, number | null][]; // [日期, 數值, 均線]
+  maLabel?: string | null;
 }
 
 export interface Section {
@@ -102,6 +103,7 @@ export interface MarketScores {
   risk_details: ScoreFactor[];
   odds: { range: string; upProb: number; avgReturn: number; days: number; baseUpProb: number } | null;
   history: [string, number, number][];
+  projection?: { opportunity: [number, number, number, number][]; risk: [number, number, number, number][] }; // [交易日數, 中, 低, 高]
 }
 
 export interface BottomFishing {
@@ -128,16 +130,30 @@ export interface Dashboard {
   sections: Section[];
 }
 
+export interface NewsImpact {
+  event: string;
+  sources: number[];
+  short_term: string;
+  long_term: string;
+  affected: { asset: string; direction: "up" | "down" | "mixed"; range: string }[];
+  priced_in: string;
+  allocation: string;
+  invalidation: string;
+}
+
 export interface AiResult {
   error?: string;
   model?: string;
   cached?: boolean;
   generatedAt?: string;
-  macro_phase_insight?: string;
-  broadcast?: string;
-  allocation_recommendation?: Record<string, number>;
+  phase?: string;
+  liquidity?: string;
+  news_impacts?: NewsImpact[];
+  playbook?: string;
+  tech_hotspots?: string;
+  allocation?: Record<string, number>;
   allocation_reasons?: Record<string, string>;
-  market_insights_html?: string;
+  sources?: { title: string; link: string | null }[];
 }
 
 export interface MarketStatus {
@@ -173,6 +189,28 @@ export interface StockBrief {
   industry: string;
 }
 
+export interface Zone { low: number; high: number; touches: number }
+
+export interface TradePlan {
+  entryLow: number; entryHigh: number; entry: number; stop: number; target: number; targetBasis: string;
+  rr: number | null; grade: "佳" | "普通" | "不划算" | null; upside: number; downside: number;
+}
+
+export interface Technicals {
+  close?: number;
+  date?: string;
+  mas: { days: number; name: string; value: number; above: boolean; rising: boolean }[];
+  momentum: { rsi: number; rsiPrev: number; k: number; d: number; kPrev: number; dPrev: number; macdHist: number; macdHistPrev: number; dif: number };
+  trend: { kind: "上升" | "下降" | "盤整"; monthlyPct: number; r2: number; days: number; start: [string, number]; end: [string, number]; channel: [number, number] } | null;
+  atr?: number;
+  supports: Zone[];
+  resistances: Zone[];
+  plan: TradePlan;
+  readings: string[];
+  chart?: (string | number | null)[][]; // [日期, 收盤, 各均線...]
+  chartMas?: number[];
+}
+
 export interface StockCheck {
   status: "ok";
   stock: StockBrief;
@@ -190,10 +228,12 @@ export interface StockCheck {
     balance: { debtRatio: number | null; currentRatio: number | null; cash: number | null } | null;
     valuation: { pe: number | null; pePercentile: number | null; pb: number; dividendYield: number } | null;
     flows: { foreign20d: number; trust20d: number; days: number } | null;
+    technicals: Technicals | null;
   };
   ai: {
     summary: string; stance: string; price_3m: { bear: number; base: number; bull: number } | null;
     reasoning: string; strengths: string[]; risks: string[]; catalysts: string[]; valuation: string; for_long_term_holder: string; outsideBand: boolean;
+    technical_view?: string; trade_case?: string; invalidation?: string;
   } | null;
 }
 
@@ -230,6 +270,7 @@ export interface RadarStock {
   close: number; pe: number | null; normalPE: number | null; fairPrice: number | null; fairGap: number | null;
   yoy3: number | null; latestYoy: number | null; accel: number | null; dividendYield: number | null;
   theme: string | null; indirectTheme: string | null; business: string | null; why: string | null;
+  technicals: Technicals | null; case: string | null; invalidation: string | null;
 }
 
 export interface RadarResult {

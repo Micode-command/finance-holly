@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
+from . import technicals
 from .taiwan import _finmind
 
 HORIZON_DAYS = 63          # 約 3 個月的交易日
@@ -69,7 +70,7 @@ def fetch_stock_data(stock_id):
     today = datetime.now()
     since = lambda days: (today - timedelta(days=days)).strftime("%Y-%m-%d")
     data = {}
-    for key, dataset, start in [("price", "TaiwanStockPrice", since(420)), ("revenue", "TaiwanStockMonthRevenue", since(800)),
+    for key, dataset, start in [("price", "TaiwanStockPrice", since(800)), ("revenue", "TaiwanStockMonthRevenue", since(800)),
                                 ("income", "TaiwanStockFinancialStatements", since(800)), ("balance", "TaiwanStockBalanceSheet", since(200)),
                                 ("per", "TaiwanStockPER", since(1100)), ("inst", "TaiwanStockInstitutionalInvestorsBuySell", since(45))]:
         try:
@@ -194,8 +195,10 @@ def flow_metrics(inst):
 
 
 def compute_metrics(data, taiex=None):
+    price = price_metrics(data.get("price"), taiex)
     return {
-        "price": price_metrics(data.get("price"), taiex),
+        "price": price,
+        "technicals": technicals.analyze(data.get("price"), price["band68"] if price else None),
         "revenue": revenue_metrics(data.get("revenue")),
         "income": income_metrics(data.get("income")),
         "balance": balance_metrics(data.get("balance")),
@@ -213,7 +216,8 @@ PROMPT = """你是一位嚴謹的台股基本面分析師，請用繁體中文�
 2. price_3m 的 base (基本情境) 原則上落在「68% 統計區間」內；bear / bull 大約落在「90% 統計區間」附近。若你判斷應該偏離，要在 reasoning 說明原因。
 3. 要結合「大盤局勢」：大盤偏空時，即使公司體質好也要提醒系統性風險。
 4. 不要使用「保證」「一定」等字眼，這是情境推估。
-5. 只輸出下面格式的 JSON，字串內不要換行。
+5. 「參考交易計畫」的價位由程式依支撐壓力計算，你不要改數字，只說明它成立的理由與失效條件；風險報酬比低於 1 時要明講不划算。
+6. 只輸出下面格式的 JSON，字串內不要換行。
 {
   "summary": "<一句話總評，30 字內>",
   "stance": "<偏多|中性|偏空>",
@@ -223,6 +227,9 @@ PROMPT = """你是一位嚴謹的台股基本面分析師，請用繁體中文�
   "risks": ["<目前最主要的風險 1>", "<風險 2>", "<風險 3>"],
   "catalysts": ["<可能推升股價的催化劑 1>", "<催化劑 2>"],
   "valuation": "<估值評論，引用本益比與歷史位階>",
+  "technical_view": "<技術面解讀：均線排列、支撐壓力、趨勢線、動能變化代表什麼，2~3 句>",
+  "trade_case": "<為什麼「參考交易計畫」的進場 / 目標 / 停損成立或不成立：結合技術面與基本面，2~3 句>",
+  "invalidation": "<這個判斷在什麼情況下失效 (例如跌破哪個價位、營收轉為衰退)>",
   "for_long_term_holder": "<給長期持有、調整比重的投資人的具體建議>"
 }
 """
@@ -239,6 +246,17 @@ def build_prompt(stock, m, market):
         lines += [f"【股價】{p['date']} 收盤 {p['close']:,.2f}；近 1 月 {_fmt(p['ret1m'], 1, '%')}、近 3 月 {_fmt(p['ret3m'], 1, '%')}、近 1 年 {_fmt(p['ret1y'], 1, '%')}；"
                   f"距 200 日線 {_fmt(p['ma200dev'], 1, '%')}；52 週區間 {p['low52']:,.1f}~{p['high52']:,.1f}；年化波動 {p['vol']:.0f}%；對大盤 beta {_fmt(p['beta'], 2)}",
                   f"【統計區間 (3 個月，只看波動)】68%：{p['band68'][0]:,.1f}~{p['band68'][1]:,.1f}；90%：{p['band90'][0]:,.1f}~{p['band90'][1]:,.1f}"]
+    t = m.get("technicals")
+    if t:
+        mas = "、".join(f"{x['name']} {x['value']:,.1f} ({'站上' if x['above'] else '跌破'}，{'上揚' if x['rising'] else '下彎'})" for x in t["mas"])
+        zone = lambda zs: "、".join(f"{z['low']:,.1f}~{z['high']:,.1f} (轉折 {z['touches']} 次)" for z in zs) or "無"
+        mo, tr, pl = t["momentum"], t["trend"], t["plan"]
+        lines += [f"【均線】{mas}",
+                  f"【支撐區】{zone(t['supports'])}；【壓力區】{zone(t['resistances'])}",
+                  f"【動能】RSI {mo['rsi']:.0f} (一個月前 {mo['rsiPrev']:.0f})；K {mo['k']:.0f} / D {mo['d']:.0f}；MACD 柱 {mo['macdHist']:+.2f} (一週前 {mo['macdHistPrev']:+.2f})"
+                  + (f"；近 {tr['days']} 天趨勢{tr['kind']}，每月 {tr['monthlyPct']:+.1f}%" if tr else ""),
+                  f"【參考交易計畫 (程式計算)】進場 {pl['entryLow']:,.1f}~{pl['entryHigh']:,.1f}；目標 {pl['target']:,.1f} ({pl['targetBasis']})；停損 {pl['stop']:,.1f}；"
+                  f"風險報酬比 {_fmt(pl['rr'], 1)}"]
     if r:
         lines.append(f"【月營收】{r['month']} {r['latest']:.2f} 億，年增 {_fmt(r['yoy'], 1, '%')}、月增 {_fmt(r['mom'], 1, '%')}；近 3 月年增 {_fmt(r['yoy3m'], 1, '%')}；今年累計年增 {_fmt(r['ytdYoy'], 1, '%')}")
     if i:
