@@ -3,6 +3,7 @@
 回傳的表會保留 NaN，讓指標層可以知道每個欄位真正的最後公布日。
 """
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 import feedparser
@@ -44,12 +45,10 @@ def fetch_fred(key, years_back=YEARS_BACK):
     if not key:
         return pd.DataFrame()
     start = (datetime.now() - timedelta(days=years_back * 365)).strftime("%Y-%m-%d")
-    series = []
-    for col, (sid, in_billions) in FRED_SERIES.items():
-        s = fetch_fred_series(col, sid, in_billions, start, key)
-        if s is not None:
-            series.append(s)
-        time.sleep(0.6)  # FRED 速率限制
+    # FRED 每分鐘允許 120 次請求，15 筆用 5 條連線同時抓 (原本逐筆抓 + 間隔要 15 秒)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        results = pool.map(lambda item: fetch_fred_series(item[0], item[1][0], item[1][1], start, key), FRED_SERIES.items())
+    series = [s for s in results if s is not None]
     return pd.concat(series, axis=1, sort=True) if series else pd.DataFrame()
 
 
@@ -122,7 +121,11 @@ def fetch_market_news():
 
 def load_raw(years_back=YEARS_BACK):
     """抓取全部數據，回傳 FRED + 市場 + 台股數據的原始合併表 (含 NaN)。"""
-    parts = [fetch_fred(get_secret("FRED_API_KEY"), years_back), fetch_market(years_back), fetch_taiwan(years_back)]
+    # 三大來源互不相關，同時抓：免費主機休眠喚醒後，第一位訪客要等的時間少一半以上
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs = [pool.submit(fetch_fred, get_secret("FRED_API_KEY"), years_back),
+                pool.submit(fetch_market, years_back), pool.submit(fetch_taiwan, years_back)]
+        parts = [j.result() for j in jobs]
     parts = [p for p in parts if not p.empty]
     if not parts:
         return pd.DataFrame()
