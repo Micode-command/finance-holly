@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import type { MarketStatus, NewsItem, OpenForecast } from "@/lib/types";
 
 const REFRESH_MS = 5 * 60 * 1000;
+// 分頁開著不動超過 2 小時就停止自動更新：免費主機每月只有 750 小時，
+// 一直有請求進來會讓前後端都無法休眠，很快把時數用完
+const MAX_AUTO_REFRESHES = 24;
 
 const STATE_STYLE: Record<MarketStatus["state"], { dot: string; icon: string; pulse?: boolean }> = {
   open: { dot: "bg-good", icon: "🟢", pulse: true },
@@ -84,9 +87,12 @@ function Forecast({ f, status, news }: { f: OpenForecast; status: MarketStatus; 
 export default function MarketPulse({ news }: { news: NewsItem[] }) {
   const [data, setData] = useState<{ status: MarketStatus; forecast: OpenForecast | null } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string>("");
+  const [paused, setPaused] = useState(false);
+  const [round, setRound] = useState(0);   // 使用者按「恢復更新」時 +1，重新啟動自動更新
 
   useEffect(() => {
     let alive = true;
+    let count = 0;
     const load = () =>
       fetch("/api/market")
         .then((r) => (r.ok ? r.json() : null))
@@ -98,12 +104,20 @@ export default function MarketPulse({ news }: { news: NewsItem[] }) {
         })
         .catch(() => {});
     load();
-    const id = setInterval(load, REFRESH_MS);
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return;     // 分頁在背景時不打擾主機
+      if (++count >= MAX_AUTO_REFRESHES) {
+        clearInterval(id);
+        setPaused(true);
+        return;
+      }
+      load();
+    }, REFRESH_MS);
     return () => {
       alive = false;
       clearInterval(id);
     };
-  }, []);
+  }, [round]);
 
   if (!data) return <div className="glass h-14 animate-pulse rounded-2xl" aria-label="讀取台股開盤狀態" />;
   const { status, forecast } = data;
@@ -120,7 +134,18 @@ export default function MarketPulse({ news }: { news: NewsItem[] }) {
           {s.icon} 台股{status.label}
         </span>
         <span className="text-sm text-ink-2">{status.detail}</span>
-        {updatedAt && <span className="ml-auto font-mono text-[11px] text-muted">更新 {updatedAt} · 每 5 分鐘</span>}
+        {updatedAt && (
+          <span className="ml-auto font-mono text-[11px] text-muted">
+            更新 {updatedAt} ·{" "}
+            {paused ? (
+              <button onClick={() => { setPaused(false); setRound((r) => r + 1); }} className="text-accent underline">
+                自動更新已暫停，點此更新
+              </button>
+            ) : (
+              "每 5 分鐘"
+            )}
+          </span>
+        )}
       </div>
       {forecast && (
         <div className="mt-4 border-t border-hairline pt-4">

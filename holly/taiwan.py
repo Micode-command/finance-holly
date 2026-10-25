@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from . import budget
 from .config import get_secret
 
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
@@ -40,6 +41,8 @@ TW_COLUMNS = ["TW_Foreign_Net", "TW_Foreign_Net_20D", "TW_Trust_Net_20D", "TW_Ma
 
 def _finmind(dataset, start, **params):
     # 沒有 token 時用匿名額度；雲端主機的 IP 是共用的，匿名額度常被別人用光，所以建議設定 FINMIND_TOKEN
+    if not budget.finmind.take():
+        raise RuntimeError("FinMind 每小時額度保護中 (本站上限 450 次)，請稍後再試")
     token = get_secret("FINMIND_TOKEN")
     headers = {**HEADERS, "Authorization": f"Bearer {token}"} if token else HEADERS
     r = requests.get(FINMIND_URL, params={"dataset": dataset, "start_date": start, **params}, headers=headers, timeout=60)

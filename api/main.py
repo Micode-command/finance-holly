@@ -13,7 +13,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from holly import data
-from holly import portfolio_check, radar, stock_check
+from holly import budget, portfolio_check, radar, stock_check
 from holly.access import AccessError, RateLimiter, check_limits, check_passcode
 from holly.ai_advisor import ask_gemini_json, generate_ai_summary
 from holly.config import get_secret
@@ -110,6 +110,12 @@ def health():
     return {"ok": True}
 
 
+@app.get("/api/usage")
+def usage():
+    """對外 API 用量 (給維護者確認沒有超過免費額度)"""
+    return {"finmind": budget.finmind.usage(), "gemini": budget.gemini.usage()}
+
+
 @app.get("/api/dashboard")
 def dashboard():
     _, payload = cache.get()
@@ -135,7 +141,8 @@ def market():
 # ---------- 互動工具 (需要密碼) ----------
 
 STOCK_PER_CLIENT = RateLimiter(limit=10)   # 每人每小時
-STOCK_OVERALL = RateLimiter(limit=40)      # 全站每小時 (保護 Gemini / FinMind 額度)
+STOCK_OVERALL = RateLimiter(limit=30)      # 全站每小時 (保護 Gemini / FinMind 額度)
+STOCK_DAILY = RateLimiter(limit=60, window=86400)   # 全站每天
 _stock_results = {}                         # 股票代號 → (時間, 結果)，1 小時內所有人共用
 
 
@@ -153,6 +160,12 @@ def _clean(x):
     if isinstance(x, (list, tuple)):
         return [_clean(v) for v in x]
     return x
+
+
+def _need_finmind(n, label):
+    """FinMind 剩餘額度不夠完成這次健檢時，直接拒絕 (避免做到一半資料不完整)"""
+    if budget.finmind.remaining() < n:
+        raise AccessError(429, f"台股數據來源這個小時的額度快用完了，{label}請約 1 小時後再試。")
 
 
 def _market_context(payload):
@@ -183,6 +196,9 @@ def stock_check_api(request: Request, body: dict = Body(...)):
             return _clean({"status": "ok", **hit[1], "cached": True})
 
         check_limits(client, STOCK_PER_CLIENT, STOCK_OVERALL, "個股健檢")
+        _need_finmind(6, "個股健檢")
+        if STOCK_DAILY.hit("__all__"):
+            raise AccessError(429, "個股健檢今天的全站使用次數已滿 (保護免費 AI 額度)，明天再試。")
         dataset, dash = cache.get()
         taiex = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
         metrics = stock_check.compute_metrics(stock_check.fetch_stock_data(stock["id"]), taiex)
@@ -194,7 +210,8 @@ def stock_check_api(request: Request, body: dict = Body(...)):
 
 
 PORTFOLIO_PER_CLIENT = RateLimiter(limit=5)
-PORTFOLIO_OVERALL = RateLimiter(limit=15)
+PORTFOLIO_OVERALL = RateLimiter(limit=8)
+PORTFOLIO_DAILY = RateLimiter(limit=30, window=86400)
 
 
 @app.post("/api/portfolio-check")
@@ -208,6 +225,9 @@ def portfolio_check_api(request: Request, body: dict = Body(...)):
         except portfolio_check.PortfolioInputError as e:
             raise AccessError(400, str(e))
         check_limits(client, PORTFOLIO_PER_CLIENT, PORTFOLIO_OVERALL, "配置健檢")
+        _need_finmind(3 * len(holdings), "配置健檢")
+        if PORTFOLIO_DAILY.hit("__all__"):
+            raise AccessError(429, "配置健檢今天的全站使用次數已滿 (保護免費 AI 額度)，明天再試。")
         dataset, dash = cache.get()
         taiex = dataset.release_points("TAIEX") if "TAIEX" in dataset.df.columns else None
         portfolio_check.enrich(holdings, portfolio_check.fetch_light, taiex)

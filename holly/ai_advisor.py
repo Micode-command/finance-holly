@@ -4,6 +4,7 @@ import json
 from google import genai
 from google.genai import types
 
+from . import budget
 from .config import GEMINI_MODELS
 from .data import fetch_headlines
 from .signals import pr_matrix
@@ -95,6 +96,9 @@ def ask_gemini_json(prompt, api_key, temperature=0.1):
     client = genai.Client(api_key=api_key)
     errors = []
     for model in GEMINI_MODELS:
+        if not budget.gemini.take():
+            errors.append("本站 AI 用量保護中 (每分鐘 6 次 / 每天 150 次)，請稍後再試")
+            break
         try:
             response = client.models.generate_content(
                 model=model,
