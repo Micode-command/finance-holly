@@ -83,7 +83,7 @@ export default function RiskMap({ scores, stance }: { scores: MarketScores; stan
               fill="var(--accent)" fillOpacity={0.06} stroke="var(--accent)" strokeOpacity={0.6} strokeDasharray="4 4" />
             <path d={line(proj.map((p) => [x(p.r), y(p.o)] as const))} fill="none" stroke="var(--accent)" strokeWidth={2} strokeDasharray="5 4" />
             <circle cx={x(end.r)} cy={y(end.o)} r={4} fill="var(--accent)" />
-            <text x={x(end.r)} y={y(end.o) + 20} fill="var(--accent)" fontSize={12} fontWeight={500} textAnchor="middle" paintOrder="stroke" stroke="var(--page)" strokeWidth={4}>3 個月後推估</text>
+            <text x={x(end.r) - 10} y={y(end.o) + 4} fill="var(--accent)" fontSize={12} fontWeight={500} textAnchor="end" paintOrder="stroke" stroke="var(--page)" strokeWidth={4}>3 個月後推估</text>
           </>
         )}
 
