@@ -10,6 +10,7 @@ import { Reveal } from "./Parallax";
 import { RangeProvider, RangeToggle } from "./RangeContext";
 import SectionNav from "./SectionNav";
 import ToolsPanel from "./tools/ToolsPanel";
+import ClearRetry from "./ClearRetry";
 
 /** 抓後端數據並組裝整頁 (Server Component，外層用 <Suspense> 包住) */
 export default async function Dashboard() {
@@ -25,6 +26,7 @@ export default async function Dashboard() {
 
   return (
     <RangeProvider>
+      <ClearRetry />
       <Hero data={data} />
       <div className="mx-auto mb-8 w-full max-w-[1400px] px-4 sm:px-6">
         <ToolsPanel />
