@@ -1,5 +1,4 @@
-# 後端專案 (根目錄) 不需要前端與測試
-web
+# 前端專案 (Root Directory = web) 也會讀這個檔，所以不能排除 web
 tests
 .venv
 .env
