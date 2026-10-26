@@ -86,15 +86,27 @@ tests/                 後端離線測試 (模擬數據，不需網路與金鑰)
 cd web && npx tsc --noEmit && npm run lint && npm run build   # 前端
 ```
 
-## 部署 (Render)
+## 部署 (Vercel，免費)
 
-`render.yaml` 會一次建立兩個服務：`finance-holly-api` (Python) 與 `finance-holly-web` (Next.js)。
+同一個 GitHub 倉庫在 Vercel 建兩個專案：後端 (Python FastAPI) 與前端 (Next.js)。
+之後 push 到 GitHub，兩邊都會自動重新部署。
 
-1. 把專案推到 GitHub (`.env` 已被排除，金鑰不會上傳)
-2. Render 後台 → **New → Blueprint** → 選這個倉庫 → 依提示貼上 `FRED_API_KEY`、`GEMINI_API_KEY`
-3. `API_URL` 填後端網址 (例如 `https://finance-holly-api.onrender.com`，以 Render 顯示的為準)
-4. 部署完成後打開 `finance-holly-web` 的網址即可分享
+**1. 後端**：Vercel → Add New → Project → 選這個倉庫
+- Project Name：`finance-holly-api`；Root Directory：留空 (根目錄)；Application Preset：FastAPI
+- Environment Variables：`FRED_API_KEY`、`GEMINI_API_KEY`、`FINMIND_TOKEN`、`APP_PASSCODE`
+- 進入點是根目錄的 `index.py`，Python 版本由 `.python-version` 指定
+- 部署好後打開 `https://<網址>/api/health` 應看到 `{"ok":true}`
+
+**2. 前端**：再 Add New → Project → 選同一個倉庫
+- Root Directory：`web`；Application Preset：Next.js
+- Environment Variables：`API_URL` = 後端網址 (例如 `https://finance-holly-api.vercel.app`，結尾不要加 `/`)
+
+**3. 保溫 (選用)**：GitHub 倉庫 → Settings → Secrets and variables → Actions → Variables 新增 `API_URL` (同上)，
+`.github/workflows/keep-warm.yml` 會每小時叫一次後端。
+
+注意：Vercel 是無伺服器架構，快取與速率限制存在各個執行個體的記憶體裡，閒置一段時間後會被回收，
+下一位訪客要重新抓數據 (約 6～10 秒)，AI 解析也可能重新產生。
+
+舊的 `render.yaml` 保留作為備用；搬家後可到 Render 後台把兩個服務刪掉或暫停。
 
 公開網站的保護：AI 解析每次數據更新只產生一次、所有訪客共用；「強制重新抓取」有 10 分鐘冷卻。
-
-免費方案閒置 15 分鐘會休眠，第一位訪客約需等 1 分鐘喚醒 + 30 秒抓數據。

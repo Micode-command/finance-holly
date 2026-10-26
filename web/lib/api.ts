@@ -5,7 +5,7 @@ import type { Dashboard } from "./types";
 /** Python 後端位址 (api/main.py)；部署時用環境變數 API_URL 覆寫 */
 export const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
 
-const ATTEMPTS = 4;              // Render 免費方案閒置後會休眠，喚醒 + 抓數據約 1 分鐘
+const ATTEMPTS = 4;              // 後端剛部署 / 喚醒時要等它開機 + 抓數據
 const ATTEMPT_TIMEOUT_MS = 75_000;
 const RETRY_DELAY_MS = 5_000;
 
